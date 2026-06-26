@@ -1,0 +1,11 @@
+.visual-panel { display: flex; flex-direction: column; block-size: 100%; }
+.visual-panel-toolbar {
+  display: flex; gap: 0.3rem; padding: 0.35rem 0.5rem;
+  background: var(--color-surface); border-block-end: 1px solid var(--color-border); flex-shrink: 0;
+}
+.visual-mode-btn {
+  padding: 0.25rem 0.7rem; border: 1px solid var(--color-border);
+  border-radius: 0.25rem; background: none; color: var(--color-text-muted); cursor: pointer; font-size: 0.8rem;
+}
+.visual-mode-btn.active { border-color: var(--color-turquoise); color: var(--color-turquoise); }
+.visual-panel-body { flex: 1; overflow: hidden; }

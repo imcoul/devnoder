@@ -1,0 +1,46 @@
+.grapes-wrap { display: flex; flex-direction: column; block-size: 100%; }
+.grapes-toolbar {
+  display: flex; align-items: center; gap: 0.4rem;
+  padding: 0.35rem 0.5rem;
+  background: var(--color-surface); border-block-end: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+.bp-btn {
+  padding: 0.2rem 0.5rem; border: 1px solid var(--color-border);
+  border-radius: 0.25rem; background: none; cursor: pointer; font-size: 1rem;
+}
+.bp-btn.active { border-color: var(--color-turquoise); }
+.grapes-spacer { flex: 1; }
+.a11y-btn {
+  padding: 0.2rem 0.6rem; border: 1px solid var(--color-border);
+  border-radius: 0.25rem; background: none; color: var(--color-text-muted);
+  cursor: pointer; font-size: 0.75rem;
+}
+.a11y-btn.active { border-color: var(--color-turquoise); color: var(--color-turquoise); }
+.a11y-btn.has-errors { border-color: var(--color-error); color: var(--color-error); }
+.grapes-main { flex: 1; display: flex; overflow: hidden; }
+.grapes-container { flex: 1; overflow: hidden; }
+.grapes-container .gjs-editor { block-size: 100%; }
+.a11y-panel {
+  inline-size: 16rem; flex-shrink: 0;
+  display: flex; flex-direction: column;
+  border-inline-start: 1px solid var(--color-border);
+  background: var(--color-surface); overflow: hidden;
+}
+.a11y-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.5rem 0.6rem; font-weight: 600; font-size: 0.8rem;
+  border-block-end: 1px solid var(--color-border);
+}
+.a11y-head button { background: none; border: none; cursor: pointer; color: var(--color-text-muted); }
+.a11y-list { flex: 1; overflow-y: auto; padding: 0.4rem; display: flex; flex-direction: column; gap: 0.3rem; }
+.a11y-ok { color: var(--color-success); padding: 0.5rem; font-size: 0.8rem; }
+.a11y-issue {
+  padding: 0.4rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem;
+  border-inline-start: 3px solid;
+}
+.a11y-issue--error { border-color: var(--color-error); background: #ef444418; }
+.a11y-issue--warning { border-color: var(--color-warn); background: #f59e0b18; }
+.a11y-rule { font-weight: 700; display: block; }
+.a11y-wcag { color: var(--color-text-muted); font-size: 0.68rem; }
+.a11y-msg { margin-block-start: 0.2rem; color: var(--color-text-muted); }

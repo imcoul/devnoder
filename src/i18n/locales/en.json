@@ -1,0 +1,53 @@
+{
+  "nav": {
+    "code": "Code",
+    "visual": "Visual",
+    "terminal": "Terminal",
+    "git": "Git",
+    "ai": "AI",
+    "preview": "Preview",
+    "collab": "Collab",
+    "docs": "Docs",
+    "api": "API",
+    "health": "Health",
+    "settings": "Settings",
+    "feedback": "AI Feedback",
+    "mcp": "MCP Servers",
+    "skills": "Skills"
+  },
+  "palette": {
+    "placeholder": "Type a command or search panels…",
+    "open_panel": "Open panel"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "close": "Close",
+    "copy": "Copy",
+    "loading": "Loading…"
+  },
+  "feedback": {
+    "yourAiStaysYours": "Your AI stays yours — all feedback stored locally, never transmitted",
+    "exportExplainer": "Export your rated conversations as training data. Nothing leaves your device until you press Export.",
+    "noEntries": "No feedback yet — rate AI responses using 👍 👎 ✏️ in the AI panel"
+  },
+  "mcp": {
+    "noServers": "No MCP servers added yet",
+    "connectAll": "Connect all",
+    "addServer": "Add server",
+    "termuxGuide": "Using Termux (recommended for mobile)"
+  },
+  "skills": {
+    "mySkills": "My Skills",
+    "builder": "Builder",
+    "community": "Community",
+    "triggerAlways": "Always",
+    "triggerKeyword": "Keyword",
+    "triggerAgent": "Agent",
+    "triggerFiletype": "Filetype",
+    "testSkill": "Test skill",
+    "saveSkill": "Save skill",
+    "noSkills": "No skills yet"
+  }
+}

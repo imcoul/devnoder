@@ -1,0 +1,53 @@
+{
+  "nav": {
+    "code": "كود",
+    "visual": "مرئي",
+    "terminal": "طرفية",
+    "git": "جيت",
+    "ai": "ذكاء",
+    "preview": "معاينة",
+    "collab": "تعاون",
+    "docs": "توثيق",
+    "api": "واجهة",
+    "health": "صحة",
+    "settings": "الإعدادات",
+    "feedback": "تقييم الذكاء",
+    "mcp": "خوادم MCP",
+    "skills": "مهارات"
+  },
+  "palette": {
+    "placeholder": "اكتب أمراً أو ابحث عن لوحة…",
+    "open_panel": "فتح لوحة"
+  },
+  "common": {
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "close": "إغلاق",
+    "copy": "نسخ",
+    "loading": "جارٍ التحميل…"
+  },
+  "feedback": {
+    "yourAiStaysYours": "ذكاؤك يبقى لك — كل التقييمات محفوظة محلياً، لا تُرسل أبداً",
+    "exportExplainer": "صدّر محادثاتك المُقيَّمة كبيانات تدريب. لا شيء يغادر جهازك.",
+    "noEntries": "لا تقييمات بعد — قيّم ردود الذكاء الاصطناعي بـ 👍 👎 ✏️"
+  },
+  "mcp": {
+    "noServers": "لم يُضف أي خادم MCP بعد",
+    "connectAll": "ربط الكل",
+    "addServer": "إضافة خادم",
+    "termuxGuide": "استخدام Termux (موصى به للجوال)"
+  },
+  "skills": {
+    "mySkills": "مهاراتي",
+    "builder": "منشئ",
+    "community": "مجتمع",
+    "triggerAlways": "دائماً",
+    "triggerKeyword": "كلمة مفتاحية",
+    "triggerAgent": "وكيل",
+    "triggerFiletype": "امتداد",
+    "testSkill": "اختبار",
+    "saveSkill": "حفظ",
+    "noSkills": "لا توجد مهارات"
+  }
+}

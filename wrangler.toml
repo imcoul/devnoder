@@ -1,0 +1,59 @@
+name = "devnoder"
+compatibility_date = "2024-09-23"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "devnoder-db"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "devnoder-storage"
+
+[vars]
+ENVIRONMENT = "production"
+
+# ── Skills Registry endpoint (Sprint 13) ──────────────────────────────────────
+# Add to devnoder-executor Worker:
+#
+# GET  /skills          → D1: SELECT * FROM skills ORDER BY downloads DESC LIMIT 50
+# POST /skills          → D1: INSERT INTO skills (id, name, description, ...) VALUES (...)
+# POST /skills/:id/rate → D1: UPDATE skills SET rating = ? WHERE id = ?
+#
+# D1 migration:
+# CREATE TABLE skills (
+#   id TEXT PRIMARY KEY,
+#   name TEXT NOT NULL,
+#   description TEXT,
+#   icon TEXT,
+#   trigger TEXT,
+#   trigger_value TEXT,
+#   system_prompt_prefix TEXT,
+#   system_prompt_suffix TEXT,
+#   context_injectors TEXT,  -- JSON array
+#   author TEXT,
+#   downloads INTEGER DEFAULT 0,
+#   rating REAL DEFAULT 0,
+#   created_at INTEGER
+# );
+
+# ── Templates Registry endpoint (Sprint 9) ────────────────────────────────────
+# Add to devnoder-executor Worker:
+#
+# GET  /templates              → D1: SELECT id,name,description,icon,tags,commands,download_url FROM templates
+# POST /templates/publish      → D1: INSERT + store files in R2 bucket, return download_url
+#
+# D1 migration:
+# CREATE TABLE templates (
+#   id TEXT PRIMARY KEY,
+#   name TEXT NOT NULL,
+#   description TEXT,
+#   icon TEXT,
+#   tags TEXT,        -- JSON array
+#   commands TEXT,    -- JSON array
+#   download_url TEXT,
+#   downloads INTEGER DEFAULT 0,
+#   author TEXT,
+#   created_at INTEGER
+# );
+# R2: store template JSON at templates/{id}.json

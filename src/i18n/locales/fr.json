@@ -1,0 +1,53 @@
+{
+  "nav": {
+    "code": "Code",
+    "visual": "Visuel",
+    "terminal": "Terminal",
+    "git": "Git",
+    "ai": "IA",
+    "preview": "Aperçu",
+    "collab": "Collab",
+    "docs": "Docs",
+    "api": "API",
+    "health": "Santé",
+    "settings": "Réglages",
+    "feedback": "Retours IA",
+    "mcp": "Serveurs MCP",
+    "skills": "Compétences"
+  },
+  "palette": {
+    "placeholder": "Tapez une commande ou cherchez un panneau…",
+    "open_panel": "Ouvrir panneau"
+  },
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "close": "Fermer",
+    "copy": "Copier",
+    "loading": "Chargement…"
+  },
+  "feedback": {
+    "yourAiStaysYours": "Votre IA reste à vous — tous les retours sont stockés localement, jamais transmis",
+    "exportExplainer": "Exportez vos conversations notées comme données d'entraînement. Rien ne quitte votre appareil.",
+    "noEntries": "Aucun retour pour l'instant — notez les réponses IA avec 👍 👎 ✏️"
+  },
+  "mcp": {
+    "noServers": "Aucun serveur MCP ajouté",
+    "connectAll": "Tout connecter",
+    "addServer": "Ajouter serveur",
+    "termuxGuide": "Utiliser Termux (recommandé mobile)"
+  },
+  "skills": {
+    "mySkills": "Mes Compétences",
+    "builder": "Créateur",
+    "community": "Communauté",
+    "triggerAlways": "Toujours",
+    "triggerKeyword": "Mot-clé",
+    "triggerAgent": "Agent",
+    "triggerFiletype": "Extension",
+    "testSkill": "Tester",
+    "saveSkill": "Enregistrer",
+    "noSkills": "Aucune compétence"
+  }
+}

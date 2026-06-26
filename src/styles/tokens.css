@@ -1,0 +1,101 @@
+:root, [data-theme="default"] {
+  --color-canvas:        #0D1F1E;
+  --color-surface:       #162A28;
+  --color-surface-hover: #1e3a37;
+  --color-border:        #2a3f3d;
+  --color-text:          #f0f6fc;
+  --color-text-muted:    #8b9ea0;
+  --color-turquoise:     #40E0D0;
+  --color-yellow:        #FFFF80;
+  --color-purple:        #800080;
+  --color-error:         #ef4444;
+  --color-warn:          #f59e0b;
+  --color-success:       #22c55e;
+  --font-display:        'Comfortaa', sans-serif;
+  --font-body:           'Quicksand', sans-serif;
+  --font-code:           'JetBrains Mono', monospace;
+  --radius:              0.375rem;
+  --nav-height:          3.5rem;
+}
+[data-theme="light"] {
+  --color-canvas:#f8fafc; --color-surface:#ffffff; --color-surface-hover:#f1f5f9;
+  --color-border:#e2e8f0; --color-text:#0f172a; --color-text-muted:#64748b;
+  --color-turquoise:#0891b2; --color-yellow:#d97706; --color-purple:#7c3aed;
+}
+[data-theme="protanopia"] {
+  --color-canvas:#0D1F1E; --color-surface:#162A28; --color-border:#2a3f3d;
+  --color-text:#f0f6fc; --color-text-muted:#8b9ea0;
+  --color-turquoise:#60a5fa; --color-yellow:#fcd34d; --color-purple:#818cf8;
+  --color-error:#fbbf24; --color-success:#60a5fa;
+}
+[data-theme="deuteranopia"] {
+  --color-canvas:#0D1F1E; --color-surface:#162A28; --color-border:#2a3f3d;
+  --color-text:#f0f6fc; --color-text-muted:#8b9ea0;
+  --color-turquoise:#93c5fd; --color-yellow:#fcd34d; --color-purple:#c4b5fd;
+  --color-error:#fbbf24; --color-success:#93c5fd;
+}
+[data-theme="tritanopia"] {
+  --color-canvas:#0D1F1E; --color-surface:#162A28; --color-border:#2a3f3d;
+  --color-text:#f0f6fc; --color-text-muted:#8b9ea0;
+  --color-turquoise:#f87171; --color-yellow:#a78bfa; --color-purple:#f472b6;
+  --color-error:#f87171; --color-success:#a78bfa;
+}
+[data-theme="hc-aaa"] {
+  --color-canvas:#000000; --color-surface:#0a0a0a; --color-surface-hover:#1a1a1a;
+  --color-border:#ffffff; --color-text:#ffffff; --color-text-muted:#cccccc;
+  --color-turquoise:#00ffff; --color-yellow:#ffff00; --color-purple:#ff00ff;
+  --color-error:#ff4444; --color-success:#00ff00;
+}
+[data-theme="hc-light"] {
+  --color-canvas:#ffffff; --color-surface:#f5f5f5; --color-surface-hover:#eeeeee;
+  --color-border:#000000; --color-text:#000000; --color-text-muted:#333333;
+  --color-turquoise:#005f5f; --color-yellow:#5f4f00; --color-purple:#5f005f;
+  --color-error:#cc0000; --color-success:#005f00;
+}
+[data-theme="grayscale"] {
+  --color-canvas:#111111; --color-surface:#1e1e1e; --color-surface-hover:#2a2a2a;
+  --color-border:#444444; --color-text:#eeeeee; --color-text-muted:#888888;
+  --color-turquoise:#cccccc; --color-yellow:#aaaaaa; --color-purple:#999999;
+  --color-error:#bbbbbb; --color-success:#dddddd;
+}
+
+/* ── Srvel brand aliases (canonical names used by all Sprint 0-10 components) ── */
+:root, [data-theme="default"] {
+  --srvel-turquoise:    #40E0D0;
+  --srvel-yellow:       #FFFF80;
+  --srvel-purple:       #800080;
+  --color-primary:      var(--color-turquoise);
+  --color-primary-hover:#33bdb0;
+  --color-accent:       var(--color-yellow);
+  --color-danger:       var(--color-error);
+  --color-warning:      var(--color-warn);
+  --canvas-base:        var(--color-canvas);
+  --canvas-surface:     var(--color-surface);
+  --canvas-raised:      #1e3a37;
+  --canvas-hover:       var(--color-surface-hover);
+  --canvas-active:      rgba(64,224,208,0.12);
+  --canvas-border:      var(--color-border);
+  --text-primary:       var(--color-text);
+  --text-secondary:     #c8e6e4;
+  --text-muted:         var(--color-text-muted);
+  --text-on-primary:    #0D1F1E;
+  --font-mono:          var(--font-code);
+  --space-1: 0.25rem; --space-2: 0.5rem;  --space-3: 0.75rem;
+  --space-4: 1rem;    --space-6: 1.5rem;  --space-8: 2rem;
+  --text-xs: 0.75rem; --text-sm: 0.875rem; --text-md: 1rem;
+  --text-lg: 1.25rem; --text-xl: 1.5rem;
+  --radius-sm: 0.25rem; --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;  --radius-full: 9999px;
+  --transition-fast: 120ms ease;
+  --color-success: #51CF66;
+  --nav-bg: var(--color-surface);
+  --nav-icon-active: var(--color-turquoise);
+}
+[data-theme="high-contrast"] {
+  --color-primary: #00ffff; --canvas-base: #000; --canvas-border: #fff;
+  --text-primary: #fff; --canvas-surface: #0a0a0a; --canvas-raised: #111;
+}
+[data-theme="high-contrast-light"] {
+  --color-primary: #005f5f; --canvas-base: #fff; --canvas-border: #000;
+  --text-primary: #000; --canvas-surface: #f5f5f5; --canvas-raised: #eee;
+}

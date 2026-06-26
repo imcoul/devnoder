@@ -1,0 +1,57 @@
+.community-panel { display:flex; flex-direction:column; block-size:100%; background:var(--color-canvas); color:var(--color-text); font-size:0.83rem; }
+.community-tabs { display:flex; background:var(--color-surface); border-block-end:1px solid var(--color-border); flex-shrink:0; }
+.community-tab { padding:0.45rem 0.8rem; border:none; background:none; color:var(--color-text-muted); cursor:pointer; font-size:0.78rem; border-block-end:2px solid transparent; white-space:nowrap; }
+.community-tab.active { color:var(--color-turquoise); border-block-end-color:var(--color-turquoise); }
+.community-body { flex:1; overflow-y:auto; display:flex; flex-direction:column; }
+.community-section-head { padding:0.35rem 0.6rem; background:var(--color-surface); font-size:0.72rem; font-weight:700; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:0.05em; border-block-end:1px solid var(--color-border); flex-shrink:0; }
+.community-divider { block-size:1px; background:var(--color-border); margin-block:0.3rem; }
+.community-empty { padding:0.8rem 0.6rem; color:var(--color-text-muted); font-size:0.78rem; }
+.plugin-row { display:flex; align-items:flex-start; gap:0.6rem; padding:0.6rem; border-block-end:1px solid var(--color-border); }
+.plugin-row:hover { background:var(--color-surface); }
+.plugin-icon { font-size:1.2rem; flex-shrink:0; margin-block-start:0.1rem; }
+.plugin-info { flex:1; min-inline-size:0; }
+.plugin-name { font-weight:600; font-size:0.83rem; }
+.plugin-version { font-size:0.7rem; color:var(--color-text-muted); font-weight:400; }
+.plugin-desc { font-size:0.75rem; color:var(--color-text-muted); margin-block-start:0.15rem; }
+.plugin-perms { font-size:0.68rem; color:var(--color-turquoise); margin-block-start:0.2rem; opacity:0.7; }
+.plugin-actions { display:flex; align-items:center; gap:0.4rem; flex-shrink:0; }
+.plugin-toggle { position:relative; display:inline-block; inline-size:2rem; block-size:1.1rem; }
+.plugin-toggle input { opacity:0; inline-size:0; block-size:0; }
+.toggle-track { position:absolute; inset:0; background:var(--color-border); border-radius:1rem; cursor:pointer; transition:background 0.2s; }
+.plugin-toggle input:checked + .toggle-track { background:var(--color-turquoise); }
+.toggle-track::before { content:''; position:absolute; inline-size:0.85rem; block-size:0.85rem; inset-block-start:0.125rem; inset-inline-start:0.125rem; background:#fff; border-radius:50%; transition:transform 0.2s; }
+.plugin-toggle input:checked + .toggle-track::before { transform:translateX(0.9rem); }
+.plugin-remove-btn { background:none; border:none; color:var(--color-text-muted); cursor:pointer; font-size:0.85rem; }
+.plugin-remove-btn:hover { color:var(--color-error); }
+.install-btn { padding:0.25rem 0.7rem; border:1px solid var(--color-turquoise); border-radius:0.25rem; background:none; color:var(--color-turquoise); cursor:pointer; font-size:0.75rem; white-space:nowrap; flex-shrink:0; }
+.install-btn:hover:not(:disabled) { background:#40E0D015; }
+.install-btn:disabled { opacity:0.4; cursor:default; }
+.theme-search-row { display:flex; gap:0.4rem; padding:0.5rem; border-block-end:1px solid var(--color-border); background:var(--color-surface); flex-shrink:0; }
+.theme-search { flex:1; padding:0.3rem 0.5rem; border:1px solid var(--color-border); border-radius:0.25rem; background:var(--color-canvas); color:var(--color-text); font-size:0.82rem; }
+.theme-tag-select { padding:0.3rem 0.4rem; border:1px solid var(--color-border); border-radius:0.25rem; background:var(--color-surface); color:var(--color-text); font-size:0.75rem; cursor:pointer; }
+.theme-active-bar { display:flex; justify-content:space-between; align-items:center; padding:0.35rem 0.6rem; background:#40E0D015; border-block-end:1px solid var(--color-border); font-size:0.75rem; color:var(--color-turquoise); flex-shrink:0; }
+.theme-clear-btn { background:none; border:1px solid var(--color-turquoise); border-radius:0.2rem; color:var(--color-turquoise); cursor:pointer; font-size:0.72rem; padding:0.1rem 0.4rem; }
+.theme-card { display:flex; align-items:flex-start; gap:0.6rem; padding:0.6rem; border-block-end:1px solid var(--color-border); }
+.theme-card:hover { background:var(--color-surface); }
+.theme-card.applied { border-inline-start:3px solid var(--color-turquoise); }
+.theme-preview { display:flex; flex-direction:column; gap:2px; flex-shrink:0; border-radius:0.25rem; overflow:hidden; inline-size:2rem; }
+.theme-preview-swatch { block-size:0.6rem; inline-size:100%; }
+.theme-info { flex:1; min-inline-size:0; display:flex; flex-direction:column; gap:0.2rem; }
+.theme-name { font-weight:600; font-size:0.83rem; display:flex; align-items:center; gap:0.4rem; }
+.theme-applied-badge { font-size:0.65rem; background:#40E0D020; color:var(--color-turquoise); padding:0.1rem 0.35rem; border-radius:1rem; }
+.theme-author { font-size:0.7rem; color:var(--color-text-muted); }
+.theme-desc { font-size:0.75rem; color:var(--color-text-muted); }
+.theme-meta { display:flex; align-items:center; gap:0.5rem; font-size:0.72rem; }
+.star-rating { color:var(--color-yellow); letter-spacing:-0.05em; }
+.theme-downloads { color:var(--color-text-muted); }
+.theme-tags { display:flex; gap:0.25rem; flex-wrap:wrap; }
+.theme-tag { font-size:0.65rem; padding:0.1rem 0.3rem; border-radius:1rem; background:var(--color-surface); border:1px solid var(--color-border); color:var(--color-text-muted); }
+.compute-card { margin:0.6rem; padding:0.8rem; border:1px solid var(--color-border); border-radius:0.4rem; display:flex; flex-direction:column; gap:0.6rem; }
+.compute-card-title { font-weight:700; font-size:0.88rem; }
+.compute-desc { font-size:0.78rem; color:var(--color-text-muted); line-height:1.5; }
+.compute-stats { display:grid; grid-template-columns:repeat(2,1fr); gap:0.4rem; }
+.compute-stat { display:flex; flex-direction:column; align-items:center; padding:0.5rem; background:var(--color-surface); border-radius:0.3rem; border:1px solid var(--color-border); }
+.stat-val { font-size:1.2rem; font-weight:700; color:var(--color-turquoise); }
+.stat-label { font-size:0.68rem; color:var(--color-text-muted); }
+.compute-toggle-btn { padding:0.4rem 0.8rem; border:1px solid var(--color-border); border-radius:0.35rem; background:none; color:var(--color-text); cursor:pointer; font-size:0.82rem; align-self:flex-start; }
+.compute-toggle-btn.active { border-color:var(--color-success); color:var(--color-success); background:#22c55e15; }

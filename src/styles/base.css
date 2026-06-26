@@ -1,0 +1,22 @@
+@import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&family=Quicksand:wght@400;600;700&family=Cairo:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { block-size: 100%; inline-size: 100%; overflow: hidden; }
+body {
+  font-family: var(--font-body);
+  background: var(--color-canvas);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+:lang(ar) body { font-family: 'Cairo', sans-serif; direction: rtl; }
+.app-root { display: flex; flex-direction: column; block-size: 100%; overflow: hidden; }
+.app-main { flex: 1; overflow: hidden; position: relative; }
+::-webkit-scrollbar { inline-size: 4px; block-size: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); }
+button, input, select, textarea { font-family: inherit; }
+a { color: var(--color-turquoise); }
+@keyframes spin { to { transform: rotate(360deg); } }

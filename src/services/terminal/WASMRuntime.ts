@@ -1,0 +1,85 @@
+// WASMRuntime.ts — QuickJS + Pyodide + PHP + Ruby execution
+export type Runtime = 'quickjs' | 'pyodide' | 'php' | 'ruby';
+
+export interface RunResult { stdout: string; stderr: string; exitCode: number; }
+
+class WASMRuntime {
+  private quickjs: any = null;
+  private pyodide: any = null;
+  private php: any = null;
+
+  async runJS(code: string): Promise<RunResult> {
+    try {
+      if (!this.quickjs) {
+        const { newQuickJSWASMModule } = await import('@jitl/quickjs-singlefile-browser-release-sync');
+        this.quickjs = await newQuickJSWASMModule();
+      }
+      const vm = this.quickjs.newContext();
+      const logs: string[] = [];
+      const logFn = vm.newFunction('log', (...args: any[]) => {
+        logs.push(args.map((a: any) => vm.dump(a)).join(' '));
+      });
+      const console = vm.newObject();
+      vm.setProp(console, 'log', logFn);
+      vm.setProp(vm.global, 'console', console);
+      logFn.dispose(); console.dispose();
+
+      const result = vm.evalCode(code);
+      if (result.error) {
+        const err = vm.dump(result.error); result.error.dispose(); vm.dispose();
+        return { stdout: logs.join('\n'), stderr: String(err), exitCode: 1 };
+      }
+      result.value.dispose(); vm.dispose();
+      return { stdout: logs.join('\n'), stderr: '', exitCode: 0 };
+    } catch (e: any) {
+      return { stdout: '', stderr: e.message, exitCode: 1 };
+    }
+  }
+
+  async runPython(code: string): Promise<RunResult> {
+    try {
+      if (!this.pyodide) {
+        const { loadPyodide } = await import('pyodide' as any);
+        this.pyodide = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.0/full/' });
+      }
+      const stdout: string[] = [];
+      this.pyodide.setStdout({ batched: (s: string) => stdout.push(s) });
+      await this.pyodide.runPythonAsync(code);
+      return { stdout: stdout.join(''), stderr: '', exitCode: 0 };
+    } catch (e: any) {
+      return { stdout: '', stderr: e.message, exitCode: 1 };
+    }
+  }
+
+  async runPHP(code: string): Promise<RunResult> {
+    try {
+      const { startPHP } = await import('@php-wasm/web');
+      const php = await startPHP('/php-web.wasm', 'WEB');
+      const result = await php.run({ code: `<?php ${code}` });
+      return {
+        stdout: result.text ?? '',
+        stderr: result.errors?.join('\n') ?? '',
+        exitCode: result.exitCode ?? 0,
+      };
+    } catch (e: any) {
+      return { stdout: '', stderr: e.message, exitCode: 1 };
+    }
+  }
+
+  detectRuntime(filename: string, shebang?: string): Runtime {
+    if (shebang?.includes('python') || /\.py$/.test(filename)) return 'pyodide';
+    if (shebang?.includes('php')    || /\.php$/.test(filename)) return 'php';
+    if (shebang?.includes('ruby')   || /\.(rb)$/.test(filename)) return 'ruby';
+    return 'quickjs';
+  }
+
+  async run(code: string, runtime: Runtime): Promise<RunResult> {
+    switch (runtime) {
+      case 'pyodide': return this.runPython(code);
+      case 'php':     return this.runPHP(code);
+      default:        return this.runJS(code);
+    }
+  }
+}
+
+export const wasmRuntime = new WASMRuntime();
