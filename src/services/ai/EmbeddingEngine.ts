@@ -78,7 +78,7 @@ class EmbeddingEngine {
     this.loading = true;
     try {
       this.emitProgress(5, 'Loading embedding model…');
-      const { pipeline, env } = await import('@xenova/transformers');
+      const { pipeline, env } = await import('@huggingface/transformers');
       // Allow loading from CDN (cached in browser after first load)
       env.allowRemoteModels = true;
       this.pipeline = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {

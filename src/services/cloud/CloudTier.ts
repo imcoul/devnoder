@@ -27,6 +27,7 @@ export interface TierFeature {
   free:        boolean | string
   hosted:      boolean | string
   team:        boolean | string
+  [key: string]: boolean | string
 }
 
 // ── Tier features matrix ──────────────────────────────────────
@@ -61,14 +62,13 @@ export const $subscription = atom<Subscription>({
 // ── Load subscription ─────────────────────────────────────────
 
 export async function loadSubscription(): Promise<void> {
-  const cached = await getSetting<Subscription>('subscription')
+  const cached = await getSetting('subscription') as Subscription | undefined
   if (cached) {
     $subscription.set(cached)
     return
   }
 
-  // Check with billing server if token exists
-  const token = await getSetting<string>('billing.token')
+  const token = await getSetting('billing.token') as string | undefined
   if (!token || !navigator.onLine) return
 
   try {
@@ -137,7 +137,7 @@ export async function startCheckout(tier: 'hosted' | 'team', seats = 1): Promise
 }
 
 export async function openCustomerPortal(): Promise<void> {
-  const token = await getSetting<string>('billing.token')
+  const token = await getSetting('billing.token') as string | undefined
   if (!token) throw new Error('Not authenticated')
 
   const res = await fetch(`${CHECKOUT_WORKER}/portal`, {

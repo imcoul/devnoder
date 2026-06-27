@@ -151,7 +151,7 @@ export async function writeFile(filepath: string, content: string): Promise<void
     const d = parts.slice(0, i).join('/');
     try { await fs.promises.mkdir(d); } catch {}
   }
-  await fs.promises.writeFile(full, content, { encoding: 'utf8' });
+  await fs.promises.writeFile(full, content, 'utf8');
 }
 
 export async function listFiles(subdir = ''): Promise<string[]> {

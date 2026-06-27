@@ -25,7 +25,7 @@ function ThemePreview({ colors }: { colors: string[] }) {
 export default function CommunityPanel() {
   const [tab, setTab]                 = useState<Tab>('plugins');
   const [plugins, setPlugins]         = useState<Plugin[]>([]);
-  const [registry, setRegistry]       = useState<typeof [] | any[]>([]);
+  const [registry, setRegistry]       = useState<any[]>([]);
   const [themes, setThemes]           = useState<CommunityTheme[]>([]);
   const [installedThemes, setInstalledThemes] = useState<CommunityTheme[]>([]);
   const [poolStats, setPoolStats]     = useState<PoolStats | null>(null);

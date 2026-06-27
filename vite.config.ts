@@ -27,7 +27,8 @@ export default defineConfig({
       },
     }),
   ],
+  assetsInclude: [/\.dat$/, /\.wasm$/, /\.so$/, /\.la$/],
   optimizeDeps: {
-    exclude: ['@mlc-ai/web-llm'],
+    exclude: ['@mlc-ai/web-llm', '@php-wasm/web'],
   },
 });

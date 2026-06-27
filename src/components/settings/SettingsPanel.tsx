@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '@nanostores/react';
 import { useTranslation } from 'react-i18next';
-import { $theme, $lang, $ui, ThemeId, Lang } from '../../stores/ui';
+import { $theme, $lang, $ui, ThemeId, Lang, showToast } from '../../stores/ui';
 import { subscriptionService, PLANS, Tier } from '../../services/revenue/SubscriptionService';
 import { audioCueService, CueConfig } from '../../services/accessibility/AudioCueService';
 import { aiGateway } from '../../services/ai/AIGateway';

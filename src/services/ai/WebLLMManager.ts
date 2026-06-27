@@ -42,7 +42,7 @@ class WebLLMManager {
     // Transformers.js WASM fallback
     this.useTransformers = true;
     this.emitProgress(10, 'Loading Transformers.js…');
-    const { pipeline } = await import('@xenova/transformers');
+    const { pipeline } = await import('@huggingface/transformers');
     this.emitProgress(30, 'Downloading model weights…');
     this.tfPipeline = await pipeline('text-generation', 'Xenova/Qwen2.5-Coder-0.5B-Instruct', {
       progress_callback: (info: any) => {

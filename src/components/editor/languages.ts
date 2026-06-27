@@ -1,4 +1,4 @@
-import { LanguageSupport } from '@codemirror/language';
+import { LanguageSupport, StreamLanguage } from '@codemirror/language';
 
 export type LangId =
   | 'javascript' | 'typescript' | 'jsx' | 'tsx'
@@ -23,7 +23,7 @@ export function extToLang(filename: string): LangId {
   return map[ext] ?? 'plaintext';
 }
 
-const loaders: Record<LangId, () => Promise<LanguageSupport | null>> = {
+const loaders: Record<LangId, () => Promise<LanguageSupport | StreamLanguage<unknown> | null>> = {
   javascript: () => import('@codemirror/lang-javascript').then(m => m.javascript()),
   typescript: () => import('@codemirror/lang-javascript').then(m => m.javascript({ typescript: true })),
   jsx:        () => import('@codemirror/lang-javascript').then(m => m.javascript({ jsx: true })),
@@ -62,7 +62,7 @@ const loaders: Record<LangId, () => Promise<LanguageSupport | null>> = {
 
   php: () => Promise.all([
     import('@codemirror/language'),
-    import('@codemirror/legacy-modes/mode/php'),
+    import('@codemirror/legacy-modes/mode/clike'),
   ]).then(([{ StreamLanguage }, modes]) => StreamLanguage.define((modes as any).php)),
 
   ruby: () => Promise.all([
@@ -75,7 +75,7 @@ const loaders: Record<LangId, () => Promise<LanguageSupport | null>> = {
 
 const cache = new Map<LangId, LanguageSupport | null>();
 
-export async function loadLanguage(id: LangId): Promise<LanguageSupport | null> {
+export async function loadLanguage(id: LangId): Promise<LanguageSupport | StreamLanguage<unknown> | null> {
   if (cache.has(id)) return cache.get(id)!;
   try {
     const lang = await loaders[id]?.() ?? null;

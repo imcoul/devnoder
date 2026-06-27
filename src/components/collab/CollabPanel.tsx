@@ -34,7 +34,7 @@ export default function CollabPanel() {
   const create = useCallback(async () => {
     setConnecting(true); setError(null);
     try {
-      const id = CollabService.newRoomId();
+      const id = crypto.randomUUID();
       await collabService.join(id);
       setRoomId(id);
       setLink(collabService.roomLink(id));
@@ -195,5 +195,3 @@ export default function CollabPanel() {
   );
 }
 
-// Re-export for use in this file
-const { newRoomId } = collabService.constructor as unknown as typeof import('../../services/collab/CollabService').collabService & { newRoomId: () => string };

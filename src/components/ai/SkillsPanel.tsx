@@ -253,7 +253,7 @@ export default function SkillsPanel() {
             onClick={() => { setTab(t); if (t === 'builder' && !editing) setEditing({ ...BLANK_SKILL }); }}>
             {t === 'mine' ? `My Skills (${skills.length})`
               : t === 'builder' ? '+ Builder'
-              : `Community (${COMMUNITY_SKILLS.length})`}
+              : `Community (${communitySkills.length})`}
           </button>
         ))}
       </div>

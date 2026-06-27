@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { projectHealthService, HealthReport, HealthMetric } from '../../services/health/ProjectHealthService';
-import type { EmbeddingEngine } from '../../services/ai/EmbeddingEngine';
 import './HealthPanel.css';
 
 function ScoreRing({ score, grade }: { score: number; grade: string }) {
@@ -84,6 +83,9 @@ export default function HealthPanel() {
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<'all' | 'warn' | 'error'>('all');
+  const [ragStats, setRagStats] = useState<Awaited<ReturnType<typeof import('../../services/ai/EmbeddingEngine').embeddingEngine.stats>> | null>(null);
+  const [reindexing, setReindexing] = useState(false);
+  const [showFileList, setShowFileList] = useState(false);
 
   const run = useCallback(async () => {
     setLoading(true);

@@ -218,9 +218,10 @@ export default function CodeEditor() {
 // Called externally when CollabService has a live session
 export async function bindYjsCollaboration(view: EditorView, yText: any, awareness: any): Promise<() => void> {
   const { yCollab } = await import('y-codemirror.next');
-  const undoManager = new (await import('yjs')).default.UndoManager(yText);
+  const { UndoManager } = await import('yjs');
+  const undoManager = new UndoManager(yText);
   const binding = yCollab(yText, awareness, { undoManager });
   const ext = view.state.update({ effects: StateEffect.appendConfig.of([binding]) });
   view.dispatch(ext);
-  return () => binding.destroy?.();
+  return () => (binding as any).destroy?.();
 }

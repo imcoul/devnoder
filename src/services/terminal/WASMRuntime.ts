@@ -11,8 +11,9 @@ class WASMRuntime {
   async runJS(code: string): Promise<RunResult> {
     try {
       if (!this.quickjs) {
-        const { newQuickJSWASMModule } = await import('@jitl/quickjs-singlefile-browser-release-sync');
-        this.quickjs = await newQuickJSWASMModule();
+        const variant = (await import('@jitl/quickjs-singlefile-browser-release-sync')).default;
+        const { newQuickJSWASMModuleFromVariant } = await import('quickjs-emscripten');
+        this.quickjs = await newQuickJSWASMModuleFromVariant(variant);
       }
       const vm = this.quickjs.newContext();
       const logs: string[] = [];
@@ -40,7 +41,7 @@ class WASMRuntime {
     try {
       if (!this.pyodide) {
         const { loadPyodide } = await import('pyodide' as any);
-        this.pyodide = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.0/full/' });
+        this.pyodide = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.29.4/full/' });
       }
       const stdout: string[] = [];
       this.pyodide.setStdout({ batched: (s: string) => stdout.push(s) });
@@ -53,12 +54,13 @@ class WASMRuntime {
 
   async runPHP(code: string): Promise<RunResult> {
     try {
-      const { startPHP } = await import('@php-wasm/web');
-      const php = await startPHP('/php-web.wasm', 'WEB');
-      const result = await php.run({ code: `<?php ${code}` });
+      const { PHP, loadWebRuntime } = await import('@php-wasm/web');
+      const php = new PHP(await loadWebRuntime('8.4'));
+      php.writeFile('/tmp/run.php', `<?php ${code}`);
+      const result = await php.runStream({ scriptPath: '/tmp/run.php' });
       return {
-        stdout: result.text ?? '',
-        stderr: result.errors?.join('\n') ?? '',
+        stdout: await result.stdoutText ?? '',
+        stderr: await result.stderrText ?? '',
         exitCode: result.exitCode ?? 0,
       };
     } catch (e: any) {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { aiGateway, MODELS, Message } from '../../services/ai/AIGateway';
+import { aiGateway, MODELS, type Message, type ToolCallEvent } from '../../services/ai/AIGateway';
 import { AGENTS, AgentId, agentRunner } from '../../services/ai/AIAgents';
 import { parseMessage, BoltAction } from '../../services/ai/StreamingMessageParser';
 import { webLLMManager } from '../../services/ai/WebLLMManager';
