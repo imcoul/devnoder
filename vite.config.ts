@@ -9,7 +9,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
       },
       manifest: {
         name: 'DevNoder',
@@ -29,6 +29,21 @@ export default defineConfig({
   ],
   assetsInclude: [/\.dat$/, /\.wasm$/, /\.so$/, /\.la$/],
   optimizeDeps: {
-    exclude: ['@mlc-ai/web-llm', '@php-wasm/web'],
+    exclude: [
+      '@mlc-ai/web-llm',
+      '@php-wasm/web',
+      '@php-wasm/web-8-4',
+      '@php-wasm/web-8-3',
+      '@php-wasm/web-8-2',
+      '@php-wasm/web-8-1',
+      '@php-wasm/web-8-0',
+      '@php-wasm/web-7-4',
+    ],
+  },
+  ssr: {
+    external: [
+      '@php-wasm/web',
+      '@php-wasm/web-7-4',
+    ],
   },
 });

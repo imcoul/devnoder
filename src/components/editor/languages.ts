@@ -73,7 +73,7 @@ const loaders: Record<LangId, () => Promise<LanguageSupport | StreamLanguage<unk
   plaintext: () => Promise.resolve(null),
 };
 
-const cache = new Map<LangId, LanguageSupport | null>();
+const cache = new Map<LangId, LanguageSupport | StreamLanguage<unknown> | null>();
 
 export async function loadLanguage(id: LangId): Promise<LanguageSupport | StreamLanguage<unknown> | null> {
   if (cache.has(id)) return cache.get(id)!;

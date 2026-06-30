@@ -62,8 +62,9 @@ export const $subscription = atom<Subscription>({
 // ── Load subscription ─────────────────────────────────────────
 
 export async function loadSubscription(): Promise<void> {
-  const cached = await getSetting('subscription') as Subscription | undefined
-  if (cached) {
+  const raw = await getSetting('subscription', '')
+  const cached = raw ? (JSON.parse(raw) as Subscription | undefined) : undefined
+  if (cached && cached.tier) {
     $subscription.set(cached)
     return
   }
@@ -87,7 +88,7 @@ export async function loadSubscription(): Promise<void> {
       customerId:        data.customerId,
     }
     $subscription.set(sub)
-    await setSetting('subscription', sub)
+    await setSetting('subscription', JSON.stringify(sub))
   } catch { /* offline — use cached */ }
 }
 
@@ -163,7 +164,7 @@ export async function handleBillingCallback(): Promise<'success' | 'cancel' | nu
 
   if (billing === 'success') {
     // Re-fetch subscription after successful checkout
-    await getSetting('subscription').then(() => setSetting('subscription', null as any))
+    await setSetting('subscription', '')
     await loadSubscription()
     return 'success'
   }

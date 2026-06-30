@@ -54,14 +54,15 @@ class WASMRuntime {
 
   async runPHP(code: string): Promise<RunResult> {
     try {
-      const { PHP, loadWebRuntime } = await import('@php-wasm/web');
+      const { PHP } = await import('@php-wasm/universal');
+      const { loadWebRuntime } = await import('@php-wasm/web');
       const php = new PHP(await loadWebRuntime('8.4'));
       php.writeFile('/tmp/run.php', `<?php ${code}`);
       const result = await php.runStream({ scriptPath: '/tmp/run.php' });
       return {
         stdout: await result.stdoutText ?? '',
         stderr: await result.stderrText ?? '',
-        exitCode: result.exitCode ?? 0,
+        exitCode: await result.exitCode ?? 0,
       };
     } catch (e: any) {
       return { stdout: '', stderr: e.message, exitCode: 1 };
