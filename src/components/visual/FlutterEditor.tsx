@@ -156,30 +156,37 @@ export default function FlutterEditor() {
 
   return (
     <div className="flutter-editor">
-      <div className="flutter-tree">
-        <div className="flutter-tree-head">
-          <span>Widget Tree</span>
-          <button className="flutter-push-btn" onClick={pushToCode}>→ Code</button>
-        </div>
-        <div className="flutter-tree-scroll">
-          <TreeNode node={root} selected={selected}
-            onSelect={setSelected} onDelete={deleteNode} onAddChild={addChild} />
-        </div>
+      <div className="flutter-editor-notice" role="note">
+        Starter-code generator — builds a widget tree into Dart text. Not a
+        live Flutter editor: there's no Dart parser or round-trip, so
+        editing generated code directly won't update the tree above.
       </div>
-      {selectedNode && (
-        <div className="flutter-props">
-          <div className="flutter-props-head">{selectedNode.type} props</div>
-          {Object.entries(selectedNode.props).map(([k, v]) => (
-            <div key={k} className="flutter-prop-row">
-              <label className="flutter-prop-key">{k}</label>
-              <input className="flutter-prop-val" value={v}
-                onChange={e => setRoot(r => findAndUpdate(r, selectedNode.id, n => ({
-                  ...n, props: { ...n.props, [k]: e.target.value },
-                })))} />
-            </div>
-          ))}
+      <div className="flutter-editor-body">
+        <div className="flutter-tree">
+          <div className="flutter-tree-head">
+            <span>Widget Tree</span>
+            <button className="flutter-push-btn" onClick={pushToCode}>→ Code</button>
+          </div>
+          <div className="flutter-tree-scroll">
+            <TreeNode node={root} selected={selected}
+              onSelect={setSelected} onDelete={deleteNode} onAddChild={addChild} />
+          </div>
         </div>
-      )}
+        {selectedNode && (
+          <div className="flutter-props">
+            <div className="flutter-props-head">{selectedNode.type} props</div>
+            {Object.entries(selectedNode.props).map(([k, v]) => (
+              <div key={k} className="flutter-prop-row">
+                <label className="flutter-prop-key">{k}</label>
+                <input className="flutter-prop-val" value={v}
+                  onChange={e => setRoot(r => findAndUpdate(r, selectedNode.id, n => ({
+                    ...n, props: { ...n.props, [k]: e.target.value },
+                  })))} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

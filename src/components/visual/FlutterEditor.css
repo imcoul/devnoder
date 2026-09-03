@@ -1,7 +1,13 @@
 .flutter-editor {
-  display: flex; block-size: 100%;
+  display: flex; flex-direction: column; block-size: 100%;
   background: var(--color-canvas); color: var(--color-text); font-size: 0.82rem;
 }
+.flutter-editor-notice {
+  padding: 0.4rem 0.6rem; font-size: 0.72rem; line-height: 1.4;
+  color: var(--color-text-muted); background: var(--color-surface);
+  border-block-end: 1px solid var(--color-border);
+}
+.flutter-editor-body { display: flex; flex: 1; min-block-size: 0; }
 .flutter-tree {
   inline-size: 55%; display: flex; flex-direction: column;
   border-inline-end: 1px solid var(--color-border);
