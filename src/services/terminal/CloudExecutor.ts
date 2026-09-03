@@ -9,9 +9,31 @@ export interface CloudResult {
 }
 
 export const cloudExecutor = {
-  available: false, // set true after user deploys worker
+  available: false,
+  lastChecked: 0,
+
+  /** Real liveness probe against the executor Worker's /health route.
+   * Replaces a hardcoded flag nothing ever flipped — this at least tells
+   * the truth about whether the Worker is actually reachable. */
+  async checkAvailability(): Promise<boolean> {
+    try {
+      const res = await fetch(`${WORKER_URL}/health`, { signal: AbortSignal.timeout(3000) });
+      this.available = res.ok;
+    } catch {
+      this.available = false;
+    }
+    this.lastChecked = Date.now();
+    return this.available;
+  },
+
+  /** Re-check if the last probe is stale (default: older than 60s). */
+  async ensureFresh(maxAgeMs = 60_000): Promise<boolean> {
+    if (Date.now() - this.lastChecked > maxAgeMs) await this.checkAvailability();
+    return this.available;
+  },
 
   async run(code: string, language: string, timeout = 10000): Promise<CloudResult> {
+    await this.ensureFresh();
     if (!this.available) {
       return { stdout: '', stderr: 'Cloud executor not deployed. See manual tasks.', exitCode: 1, runtime: language };
     }

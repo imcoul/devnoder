@@ -1,7 +1,7 @@
 // ProjectService.ts — project lifecycle on top of db.projects + GitService's
 // per-project directory scoping. This is the thing that was missing entirely:
 // db.projects was defined but never read or written anywhere before this file.
-import { db, ProjectRecord } from '../storage/db';
+import { db, ProjectRecord, getSetting, setSetting } from '../storage/db';
 import {
   fs, initRepo, clone, stageAll, commit, setActiveProject,
 } from '../git/GitService';
@@ -11,6 +11,8 @@ import { bufferManager } from '../editor/BufferManager';
 export interface CreateProjectOptions {
   templateId?: string;
 }
+
+const LAST_ACTIVE_KEY = 'last-active-project-id';
 
 async function makeProjectRecord(name: string, gitRemote?: string): Promise<ProjectRecord> {
   const now = Date.now();
@@ -30,8 +32,26 @@ export const projectService = {
     return db.projects.orderBy('updatedAt').reverse().toArray();
   },
 
-  async hasAnyProject(): Promise<boolean> {
-    return (await db.projects.count()) > 0;
+  /** Call once at app startup. GitService's active-project pointer is an
+   * in-memory value that resets on every reload — without this, every
+   * reload would silently land in a nonexistent "default" directory
+   * instead of the project the user was actually last in. Returns the
+   * resumed project, or null if there is nothing to resume (first run). */
+  async resumeLastProject(): Promise<ProjectRecord | null> {
+    const lastId = await getSetting(LAST_ACTIVE_KEY, '');
+    if (lastId) {
+      const record = await db.projects.get(lastId);
+      if (record) { setActiveProject(record.id); return record; }
+    }
+    // Persisted id is missing or was deleted — fall back to the most
+    // recently updated project rather than silently starting empty.
+    const [mostRecent] = await this.listProjects();
+    if (mostRecent) {
+      setActiveProject(mostRecent.id);
+      await setSetting(LAST_ACTIVE_KEY, mostRecent.id);
+      return mostRecent;
+    }
+    return null;
   },
 
   /** Create a new project, optionally scaffolding it from a starter template. */
@@ -39,6 +59,7 @@ export const projectService = {
     const record = await makeProjectRecord(name);
     bufferManager.closeAllBuffers();
     setActiveProject(record.id);
+    await setSetting(LAST_ACTIVE_KEY, record.id);
     await initRepo();
 
     if (options.templateId) {
@@ -61,6 +82,7 @@ export const projectService = {
     if (!record) throw new Error(`Unknown project: ${id}`);
     bufferManager.closeAllBuffers();
     setActiveProject(id);
+    await setSetting(LAST_ACTIVE_KEY, id);
     await db.projects.put({ ...record, updatedAt: Date.now() });
     await initRepo();
   },
@@ -70,6 +92,7 @@ export const projectService = {
     const record = await makeProjectRecord(name, url);
     bufferManager.closeAllBuffers();
     setActiveProject(record.id);
+    await setSetting(LAST_ACTIVE_KEY, record.id);
     await clone(url, token);
     return record;
   },

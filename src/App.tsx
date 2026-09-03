@@ -19,9 +19,12 @@ export default function App() {
 
   useEffect(() => {
     // First-run gate: if no project has ever been created, land on the
-    // onboarding panel instead of a Code editor with nothing to edit.
-    projectService.hasAnyProject().then(has => {
-      if (!has) setPanel('onboarding');
+    // onboarding panel. Otherwise resume whichever project was last active —
+    // GitService's active-project pointer is in-memory only and resets on
+    // every reload, so without this every reload would silently land in a
+    // nonexistent "default" directory instead of the user's real project.
+    projectService.resumeLastProject().then(resumed => {
+      if (!resumed) setPanel('onboarding');
       setCheckingProjects(false);
     }).catch(() => setCheckingProjects(false));
   }, []);
@@ -37,6 +40,16 @@ export default function App() {
   }, [activePanel]);
 
   useEffect(() => {
+    // Wire the real filesystem into services that were defined to accept
+    // one via setFS() but never actually got called — health metrics were
+    // silently fabricated instead of reporting "unavailable" as a result.
+    Promise.all([
+      import('./services/git/GitService'),
+      import('./services/health/ProjectHealthService'),
+    ]).then(([{ fs }, { projectHealthService }]) => {
+      projectHealthService.setFS(fs);
+    }).catch(console.warn);
+
     // Sprint 8 — seed built-in snippets
     import('./services/snippets/SnippetService')
       .then(m => m.snippetService.init())
@@ -65,6 +78,12 @@ export default function App() {
     // Sprint 10 — load subscription tier
     import('./services/cloud/CloudTier')
       .then(m => { m.loadSubscription(); m.handleBillingCallback(); })
+      .catch(console.warn);
+
+    // Health-check the executor Worker instead of hardcoding "unavailable" —
+    // reports false honestly until the Worker is actually deployed.
+    import('./services/terminal/CloudExecutor')
+      .then(m => m.cloudExecutor.checkAvailability())
       .catch(console.warn);
   }, []);
 

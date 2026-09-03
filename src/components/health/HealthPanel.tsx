@@ -145,8 +145,16 @@ export default function HealthPanel() {
         </button>
       </div>
 
+      {/* ── Unavailable state ── */}
+      {report?.unavailable && !loading && (
+        <div className="health-empty">
+          <span>🔌</span>
+          <p>Health data unavailable — no project filesystem is connected yet.</p>
+        </div>
+      )}
+
       {/* ── Score overview ── */}
-      {report && !loading && (
+      {report && !report.unavailable && !loading && (
         <div className="health-overview">
           <ScoreRing score={report.overall} grade={report.grade} />
           <div className="health-summary">
@@ -184,7 +192,7 @@ export default function HealthPanel() {
       )}
 
       {/* ── Metric cards ── */}
-      {!loading && report && (
+      {!loading && report && !report.unavailable && (
         <div className="health-metrics">
           {filtered.length === 0 && (
             <div className="health-empty">
