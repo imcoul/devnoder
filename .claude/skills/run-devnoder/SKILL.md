@@ -96,7 +96,7 @@ Screenshots land in `/tmp/shots/` (override with `SCREENSHOT_DIR`).
 | `launch` | launch headless Chromium, wire console/request/response error logging |
 | `nav <url>` | navigate to a URL |
 | `ss [name]` | screenshot -> `/tmp/shots/<name>.png` |
-| `click <css-sel>` | click element via DOM `.click()` — **no shell quoting**, see Gotchas |
+| `click <css-sel>` | click + focus element via DOM — **no shell quoting**, see Gotchas |
 | `click-text <text>` | click the first `button`/`a`/`[role=button]` matching visible text |
 | `type <text>` | keyboard-type text into whatever's focused |
 | `press <key>` | press a single key (e.g. `Enter`) |
@@ -115,6 +115,18 @@ npm run dev   # opens on http://localhost:5173, useless headless. Ctrl-C to stop
 
 ## Gotchas
 
+- **`el.click()` alone does not reliably focus text inputs.**
+  Focus-follows-click is a real-pointer-event UA behavior; a synthetic
+  `.click()` dispatches the click event but doesn't always move keyboard
+  focus the same way, especially onto `<input>`/`<textarea>` elements.
+  Hit this directly: clicked a password input, then `type`/`enter`
+  silently landed on a stale nav `<button>` focused by an earlier command
+  in the same session — `document.activeElement` confirmed it, and the
+  value never made it into the field. The driver's `click` now calls
+  `el.focus()` before `el.click()` to cover this. If a `type`/`enter`
+  right after a `click` doesn't seem to land, verify with
+  `eval document.activeElement.outerHTML` before assuming the app is
+  broken — it may just be a focus gap in the driver call sequence.
 - **`playwright` needs an absolute-path ESM import, not the bare
   specifier.** `NODE_PATH` does not affect ESM `import` resolution the
   way it affects CommonJS `require`. The driver imports it as

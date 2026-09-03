@@ -57,6 +57,13 @@ const COMMANDS = {
     const r = await page.evaluate(s => {
       const el = document.querySelector(s);
       if (!el) return 'NOT_FOUND';
+      // el.click() does NOT reliably move keyboard focus onto text inputs
+      // the way a real pointer click does (focus-follows-click is a UA
+      // behavior tied to real pointer events, not synthetic .click() calls).
+      // Without this, a subsequent `type`/`enter` command silently lands on
+      // whatever element focus was on before - often a stale nav button
+      // from an earlier command in the same session, not the clicked input.
+      if (typeof el.focus === 'function') el.focus();
       el.click(); return 'OK';
     }, sel);
     console.log('click', sel, '->', r);
