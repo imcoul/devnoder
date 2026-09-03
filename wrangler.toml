@@ -4,7 +4,7 @@ compatibility_date = "2024-09-23"
 [[d1_databases]]
 binding = "DB"
 database_name = "devnoder-db"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "e5aaf35e-b8e7-4dc3-ad29-aa1dfaa6852e"
 
 [[r2_buckets]]
 binding = "STORAGE"
