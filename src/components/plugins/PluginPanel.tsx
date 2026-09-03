@@ -39,6 +39,11 @@ export default function PluginPanel() {
         background:'var(--color-surface)', borderBlockEnd:'1px solid var(--color-border)' }}>
         🧩 Plugins
       </div>
+      <div role="note" style={{ padding:'0.4rem 0.7rem', fontSize:'0.72rem', lineHeight:1.4,
+        color:'var(--color-text-muted)', background:'var(--color-surface)',
+        borderBlockEnd:'1px solid var(--color-border)' }}>
+        Registry preview — this list isn't fetched from a live server yet, so nothing below can actually be installed for real.
+      </div>
       <div className="community-body">
         {plugins.length > 0 && (
           <>

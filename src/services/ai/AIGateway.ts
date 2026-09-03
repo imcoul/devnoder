@@ -1,5 +1,6 @@
 // AIGateway.ts — 13 models, multi-provider streaming, tool-calling loop (Sprint 12)
 import { mcpClient } from './MCPClient';
+import { cryptoVault } from '../security/CryptoVault';
 
 export type Provider = 'webllm' | 'groq' | 'openai' | 'anthropic' | 'openrouter';
 
@@ -37,8 +38,21 @@ class AIGateway {
 
   setModel(id: string)                             { this.modelId = id; }
   getModel()                                       { return MODELS.find(m => m.id === this.modelId) ?? MODELS[0]; }
-  setKey(provider: Provider, key: string)          { this.keys[provider] = key; localStorage.setItem(`devnoder-key-${provider}`, key); }
-  loadKeys()                                       { (['groq','openai','anthropic','openrouter'] as Provider[]).forEach(p => { const k = localStorage.getItem(`devnoder-key-${p}`); if (k) this.keys[p] = k; }); }
+  setKey(provider: Provider, key: string) {
+    this.keys[provider] = key; // kept in memory for the hot request path
+    cryptoVault.encrypt(key)
+      .then(enc => localStorage.setItem(`devnoder-key-${provider}`, enc))
+      .catch(err => console.warn('Failed to encrypt API key at rest:', err));
+  }
+
+  async loadKeys(): Promise<void> {
+    for (const p of ['groq', 'openai', 'anthropic', 'openrouter'] as Provider[]) {
+      const stored = localStorage.getItem(`devnoder-key-${p}`);
+      if (!stored) continue;
+      const decrypted = await cryptoVault.decrypt(stored);
+      if (decrypted) this.keys[p] = decrypted;
+    }
+  }
 
   async stream(messages: Message[], onChunk: StreamHandler, signal?: AbortSignal): Promise<void> {
     const model = this.getModel();

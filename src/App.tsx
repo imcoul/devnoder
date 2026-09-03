@@ -7,6 +7,7 @@ import CommandPalette from './components/layout/CommandPalette';
 import ToastContainer from './components/layout/ToastContainer';
 import { audioCueService } from './services/accessibility/AudioCueService';
 import { projectService } from './services/project/ProjectService';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 export default function App() {
   const activePanel = useStore($activePanel);
@@ -106,13 +107,15 @@ export default function App() {
   }
 
   return (
-    <div className="app-root">
-      <main className="app-main">
-        <PanelShell panelId={activePanel} />
-      </main>
-      {activePanel !== 'onboarding' && <BottomNav />}
-      <CommandPalette />
-      <ToastContainer />
-    </div>
+    <ErrorBoundary>
+      <div className="app-root">
+        <main className="app-main">
+          <PanelShell panelId={activePanel} />
+        </main>
+        {activePanel !== 'onboarding' && <BottomNav />}
+        <CommandPalette />
+        <ToastContainer />
+      </div>
+    </ErrorBoundary>
   );
 }

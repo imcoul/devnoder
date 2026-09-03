@@ -1,5 +1,27 @@
 // MCPConfigStore.ts — persist MCP server configs in Dexie
 import Dexie, { Table } from 'dexie';
+import { cryptoVault } from '../security/CryptoVault';
+
+// Header values (bearer tokens, etc.) are encrypted at rest — only in the
+// Dexie record, never in the in-memory MCPServerConfig objects the rest of
+// the app (MCPClient.ts) already reads directly as plaintext.
+async function encryptHeaders(headers?: Record<string, string>): Promise<Record<string, string> | undefined> {
+  if (!headers) return headers;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(headers)) out[k] = await cryptoVault.encrypt(v);
+  return out;
+}
+
+async function decryptHeaders(headers?: Record<string, string>): Promise<Record<string, string> | undefined> {
+  if (!headers) return headers;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(headers)) out[k] = (await cryptoVault.decrypt(v)) ?? v;
+  return out;
+}
+
+async function decryptConfig(config: MCPServerConfig): Promise<MCPServerConfig> {
+  return { ...config, headers: await decryptHeaders(config.headers) };
+}
 
 export type MCPTransport = 'stdio' | 'websocket' | 'sse';
 
@@ -78,15 +100,17 @@ export const MCP_PRESETS: Omit<MCPServerConfig, 'id' | 'addedAt' | 'enabled'>[] 
 
 export const mcpConfigStore = {
   async getAll(): Promise<MCPServerConfig[]> {
-    return db.servers.orderBy('addedAt').toArray();
+    const rows = await db.servers.orderBy('addedAt').toArray();
+    return Promise.all(rows.map(decryptConfig));
   },
 
   async getEnabled(): Promise<MCPServerConfig[]> {
-    return db.servers.where('enabled').equals(1).toArray();
+    const rows = await db.servers.where('enabled').equals(1).toArray();
+    return Promise.all(rows.map(decryptConfig));
   },
 
   async add(config: Omit<MCPServerConfig, 'addedAt'>): Promise<string> {
-    await db.servers.put({ ...config, addedAt: Date.now() });
+    await db.servers.put({ ...config, headers: await encryptHeaders(config.headers), addedAt: Date.now() });
     return config.id;
   },
 
@@ -95,7 +119,8 @@ export const mcpConfigStore = {
   },
 
   async updateMeta(id: string, meta: Partial<MCPServerConfig>): Promise<void> {
-    await db.servers.update(id, meta);
+    const patch = meta.headers ? { ...meta, headers: await encryptHeaders(meta.headers) } : meta;
+    await db.servers.update(id, patch);
   },
 
   async delete(id: string): Promise<void> {
