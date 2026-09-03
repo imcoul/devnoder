@@ -2,9 +2,35 @@
 import git from 'isomorphic-git';
 import http from 'isomorphic-git/http/web';
 import FS from '@isomorphic-git/lightning-fs';
+import { atom } from 'nanostores';
+import { Buffer } from 'buffer';
+
+// isomorphic-git's index (.git/index) parser references the Node global
+// `Buffer` directly (_GitIndex.from -> updateCachedIndexFile), which Vite
+// does not polyfill in the browser. This only throws the FIRST time a repo's
+// index is read with no cached index yet (a genuinely fresh, zero-commit
+// repo) — which the old single hardcoded /devnoder path never hit once it
+// had been used a single time, so this was invisible until real multi-project
+// onboarding started creating brand-new repos.
+if (typeof globalThis.Buffer === 'undefined') {
+  (globalThis as any).Buffer = Buffer;
+}
 
 export const fs = new FS('devnoder-fs');
-export const dir = '/devnoder';
+
+// Project-scoped root. lightning-fs is one filesystem that can hold many
+// sibling project directories (/projects/<id>) — only the active id changes,
+// not the fs instance itself. `dir` used to be a hardcoded '/devnoder'
+// constant; every function below now reads getDir() instead.
+let activeProjectId = 'default';
+export const $activeProjectId = atom<string>('default');
+
+export function dirFor(id: string): string { return `/projects/${id}`; }
+export function getDir(): string { return dirFor(activeProjectId); }
+export function setActiveProject(id: string): void {
+  activeProjectId = id;
+  $activeProjectId.set(id);
+}
 
 export interface FileStatus {
   path: string;
@@ -27,9 +53,11 @@ export interface Branch {
 
 // Init or open repo
 export async function initRepo(): Promise<void> {
+  const dir = getDir();
   try {
     await git.resolveRef({ fs, dir, ref: 'HEAD' });
   } catch {
+    await fs.promises.mkdir('/projects').catch(() => {});
     await fs.promises.mkdir(dir).catch(() => {});
     await git.init({ fs, dir, defaultBranch: 'main' });
     await git.setConfig({ fs, dir, path: 'user.name',  value: 'DevNoder User' });
@@ -38,6 +66,7 @@ export async function initRepo(): Promise<void> {
 }
 
 export async function getStatus(): Promise<FileStatus[]> {
+  const dir = getDir();
   const matrix = await git.statusMatrix({ fs, dir });
   return matrix
     .filter(([, head, workdir, stage]) => !(head === 1 && workdir === 1 && stage === 1))
@@ -53,14 +82,17 @@ export async function getStatus(): Promise<FileStatus[]> {
 }
 
 export async function stageFile(filepath: string): Promise<void> {
+  const dir = getDir();
   await git.add({ fs, dir, filepath });
 }
 
 export async function unstageFile(filepath: string): Promise<void> {
+  const dir = getDir();
   await git.resetIndex({ fs, dir, filepath });
 }
 
 export async function stageAll(): Promise<void> {
+  const dir = getDir();
   const status = await getStatus();
   for (const f of status) {
     if (f.status !== 'unmodified') await git.add({ fs, dir, filepath: f.path });
@@ -68,6 +100,7 @@ export async function stageAll(): Promise<void> {
 }
 
 export async function commit(message: string): Promise<string> {
+  const dir = getDir();
   // cue fired by GitPanel after success/error
   return git.commit({ fs, dir, message,
     author: {
@@ -78,6 +111,7 @@ export async function commit(message: string): Promise<string> {
 }
 
 export async function getLog(depth = 20): Promise<CommitEntry[]> {
+  const dir = getDir();
   try {
     const log = await git.log({ fs, dir, depth });
     return log.map(entry => ({
@@ -90,6 +124,7 @@ export async function getLog(depth = 20): Promise<CommitEntry[]> {
 }
 
 export async function getBranches(): Promise<Branch[]> {
+  const dir = getDir();
   const [local, current] = await Promise.all([
     git.listBranches({ fs, dir }),
     git.currentBranch({ fs, dir }),
@@ -98,18 +133,22 @@ export async function getBranches(): Promise<Branch[]> {
 }
 
 export async function createBranch(name: string): Promise<void> {
+  const dir = getDir();
   await git.branch({ fs, dir, ref: name });
 }
 
 export async function checkoutBranch(name: string): Promise<void> {
+  const dir = getDir();
   await git.checkout({ fs, dir, ref: name });
 }
 
 export async function deleteBranch(name: string): Promise<void> {
+  const dir = getDir();
   await git.deleteBranch({ fs, dir, ref: name });
 }
 
 export async function push(remote = 'origin', branch?: string, token?: string): Promise<void> {
+  const dir = getDir();
   const ref = branch ?? (await git.currentBranch({ fs, dir })) ?? 'main';
   await git.push({
     fs, http, dir, remote, ref,
@@ -118,6 +157,7 @@ export async function push(remote = 'origin', branch?: string, token?: string): 
 }
 
 export async function pull(remote = 'origin', branch?: string, token?: string): Promise<void> {
+  const dir = getDir();
   const ref = branch ?? (await git.currentBranch({ fs, dir })) ?? 'main';
   await git.pull({
     fs, http, dir, remote, ref,
@@ -127,6 +167,8 @@ export async function pull(remote = 'origin', branch?: string, token?: string): 
 }
 
 export async function clone(url: string, token?: string): Promise<void> {
+  const dir = getDir();
+  await fs.promises.mkdir('/projects').catch(() => {});
   await git.clone({
     fs, http, dir, url,
     onAuth: token ? () => ({ username: token }) : undefined,
@@ -136,15 +178,18 @@ export async function clone(url: string, token?: string): Promise<void> {
 }
 
 export async function addRemote(name: string, url: string): Promise<void> {
+  const dir = getDir();
   await git.addRemote({ fs, dir, remote: name, url });
 }
 
 export async function readFile(filepath: string): Promise<string> {
+  const dir = getDir();
   const raw = await fs.promises.readFile(`${dir}/${filepath}`, { encoding: 'utf8' });
   return typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
 }
 
 export async function writeFile(filepath: string, content: string): Promise<void> {
+  const dir = getDir();
   const full = `${dir}/${filepath}`;
   const parts = full.split('/');
   for (let i = 2; i < parts.length; i++) {
@@ -155,6 +200,7 @@ export async function writeFile(filepath: string, content: string): Promise<void
 }
 
 export async function listFiles(subdir = ''): Promise<string[]> {
+  const dir = getDir();
   const base = subdir ? `${dir}/${subdir}` : dir;
   const recurse = async (p: string): Promise<string[]> => {
     const entries = await fs.promises.readdir(p);

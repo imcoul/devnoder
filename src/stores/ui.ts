@@ -1,6 +1,7 @@
 import { atom, map } from 'nanostores';
 
 export type PanelId =
+  | 'onboarding'
   | 'code' | 'visual' | 'terminal' | 'git' | 'ai'
   | 'preview' | 'collab' | 'docs' | 'api' | 'health'
   | 'community' | 'settings' | 'plugins' | 'billing' | 'about'

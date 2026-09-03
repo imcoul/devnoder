@@ -1,19 +1,30 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStore } from '@nanostores/react';
-import { $activePanel, $theme } from './stores/ui';
+import { $activePanel, $theme, setPanel } from './stores/ui';
 import { PanelShell } from './components/panels';
 import BottomNav from './components/layout/BottomNav';
 import CommandPalette from './components/layout/CommandPalette';
 import ToastContainer from './components/layout/ToastContainer';
 import { audioCueService } from './services/accessibility/AudioCueService';
+import { projectService } from './services/project/ProjectService';
 
 export default function App() {
   const activePanel = useStore($activePanel);
   const theme       = useStore($theme);
+  const [checkingProjects, setCheckingProjects] = useState(true);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    // First-run gate: if no project has ever been created, land on the
+    // onboarding panel instead of a Code editor with nothing to edit.
+    projectService.hasAnyProject().then(has => {
+      if (!has) setPanel('onboarding');
+      setCheckingProjects(false);
+    }).catch(() => setCheckingProjects(false));
+  }, []);
 
   useEffect(() => {
     audioCueService.load();
@@ -71,12 +82,16 @@ export default function App() {
     }
   }, []);
 
+  if (checkingProjects) {
+    return <div className="app-root" aria-busy="true" />;
+  }
+
   return (
     <div className="app-root">
       <main className="app-main">
         <PanelShell panelId={activePanel} />
       </main>
-      <BottomNav />
+      {activePanel !== 'onboarding' && <BottomNav />}
       <CommandPalette />
       <ToastContainer />
     </div>

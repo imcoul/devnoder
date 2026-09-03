@@ -11,6 +11,7 @@
     "deploy": "wrangler deploy"
   },
   "dependencies": {
+    "buffer": "^6.0.3",
     "dexie": "^4.4.4",
     "i18next": "^26.3.3",
     "i18next-browser-languagedetector": "^8.2.1",

@@ -75,6 +75,14 @@ export const bufferManager = {
     }
   },
 
+  /** Close every open buffer. Required on project switch — a bare path like
+   * src/App.tsx from one project is meaningless (or worse, silently wrong)
+   * once GitService is scoped to a different project's directory. */
+  closeAllBuffers() {
+    $buffers.set([]);
+    $activeBuffer.set(null);
+  },
+
   swipeNext() {
     const list = $buffers.get();
     if (list.length < 2) return;

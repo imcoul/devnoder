@@ -49,5 +49,31 @@
     "testSkill": "Test skill",
     "saveSkill": "Save skill",
     "noSkills": "No skills yet"
+  },
+  "onboarding": {
+    "welcomeTitle": "Welcome to DevNoder",
+    "yourProjectsTitle": "Your projects",
+    "welcomeSubtitle": "Create a project to get started — nothing is set up yet.",
+    "openSubtitle": "Open an existing project, or start a new one.",
+    "loading": "Loading projects…",
+    "createBlank": "Create blank project",
+    "startFromTemplate": "Start from a template",
+    "cloneRepo": "Clone a repository",
+    "projectName": "Project name",
+    "namePlaceholder": "my-project",
+    "chooseTemplate": "Choose a template",
+    "repoUrl": "Repository URL",
+    "accessToken": "Access token",
+    "accessTokenOptional": "(optional, for private repos)",
+    "create": "Create project",
+    "creating": "Creating…",
+    "clone": "Clone repository",
+    "cloning": "Cloning…",
+    "cancel": "Cancel",
+    "enterName": "Enter a project name",
+    "chooseTemplateError": "Choose a template",
+    "enterUrl": "Enter a repository URL",
+    "openProject": "Open project {{name}}",
+    "updated": "Updated {{date}}"
   }
 }
