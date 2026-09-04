@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '@nanostores/react';
 import { $activePanel, $theme, setPanel } from './stores/ui';
 import { PanelShell } from './components/panels';
@@ -13,6 +13,7 @@ export default function App() {
   const activePanel = useStore($activePanel);
   const theme       = useStore($theme);
   const [checkingProjects, setCheckingProjects] = useState(true);
+  const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -35,9 +36,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // Announce panel switch to screen reader / audio cue users
+    // Announce panel switch to screen reader / audio cue users, and actually
+    // move DOM focus there — the announcement alone doesn't help keyboard
+    // users, whose focus previously stayed wherever it was on the old panel.
     const label = activePanel.charAt(0).toUpperCase() + activePanel.slice(1);
     audioCueService.announcePanel(label);
+    mainRef.current?.focus();
   }, [activePanel]);
 
   useEffect(() => {
@@ -109,7 +113,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <div className="app-root">
-        <main className="app-main">
+        <main className="app-main" ref={mainRef} tabIndex={-1}>
           <PanelShell panelId={activePanel} />
         </main>
         {activePanel !== 'onboarding' && <BottomNav />}

@@ -10,8 +10,17 @@ export type PanelId =
 export type ThemeId = 'default' | 'light' | 'protanopia' | 'deuteranopia' | 'tritanopia' | 'hc-aaa' | 'hc-light' | 'grayscale';
 export type Lang = 'en' | 'fr' | 'ar';
 
+const THEME_IDS: ThemeId[] = ['default', 'light', 'protanopia', 'deuteranopia', 'tritanopia', 'hc-aaa', 'hc-light', 'grayscale'];
+
+function getStoredTheme(): ThemeId {
+  const stored = localStorage.getItem('devnoder-theme');
+  return (THEME_IDS as string[]).includes(stored ?? '') ? (stored as ThemeId) : 'default';
+}
+
 export const $activePanel = atom<PanelId>('code');
-export const $theme       = atom<ThemeId>('default');
+// Was hardcoded to 'default', ignoring the theme saved in SettingsPanel —
+// every reload silently reset the user's chosen theme back to default.
+export const $theme       = atom<ThemeId>(getStoredTheme());
 export const $commandPaletteOpen = atom(false);
 export const $lang        = atom<Lang>('en');
 
