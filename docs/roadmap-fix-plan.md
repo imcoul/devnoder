@@ -17,7 +17,7 @@ A copy of this plan lives in the repo at `devnoder/docs/roadmap-fix-plan.md` and
 
 ## Status as of 2026-09-04 — handover for continuing elsewhere
 
-**Phases 0–6 are done, committed to `claude/devnoder-wrangler-issues-kyhb0i`, and verified against a real running instance with the `.claude/skills/run-devnoder/` Playwright driver — not just typechecked.** Commits, in order: `68ba368` (Phase 0), `4e01f2a` (Phase 1), `ef93fbf` (Phase 2), `40fbd50` (Phase 3), `50a47fd` (Phase 4), `7a4a2a8` (skill fix), `2eb6256` (Phase 5), plus a follow-up Phase 6 commit.
+**Phases 0–6 are done in `devnoder` on `claude/devnoder-wrangler-issues-kyhb0i` (PR #2), and Phase 8 is done in the separate `devnoder-cli` repo on `claude/devnoder-handover-docs-834g2y` (commit `07d51c1`, pushed, no PR opened yet) — both verified against real running instances, not just typechecked.** `devnoder` commits, in order: `68ba368` (Phase 0), `4e01f2a` (Phase 1), `ef93fbf` (Phase 2), `40fbd50` (Phase 3), `50a47fd` (Phase 4), `7a4a2a8` (skill fix), `2eb6256` (Phase 5), plus a follow-up Phase 6 commit. Phase 7 remains blocked (needs the project owner's Cloudflare secrets, and no source for its Workers exists in any repo in scope). Phases 9–11 remain unstarted.
 
 **Also diagnosed (not a code fix, no commit)**: the "Workers Builds: devnoder" GitHub check on PR #2 fails on every push, including on `main` — `wrangler.toml` has no `main` entry point or `[assets]` directory, and even adding `[assets] directory = "./dist"` hits Cloudflare Workers' hard 25 MiB per-asset limit against this build's ~29 MiB Pyodide `.dat` file. The app's real deploy path is `.github/workflows/ci.yml` → Cloudflare Pages (no such limit), which is green. This looks like a redundant/orphaned second Cloudflare Git integration pointed at the repo — recommended the project owner disable it in the Cloudflare dashboard rather than trying to make Workers Static Assets work for this build. Full diagnosis is on the PR as a comment.
 
@@ -88,12 +88,16 @@ Write this plan to `devnoder/docs/roadmap-fix-plan.md`, commit + push. Create/up
 - **Secrets**: I write the code + hand over exact `wrangler secret put <NAME>` commands; the user runs them locally (confirmed approach) — never typed into chat, never committed.
 - **Deploy**: real `wrangler deploy` needs the user's real Cloudflare credentials — hand over exact commands, user runs them.
 
-## Phase 8 — Fix `devnoder-cli` correctly this time (P1, separate repo) ⚪ Not started
+## Phase 8 — Fix `devnoder-cli` correctly this time (P1, separate repo) ✅ Done, verified
 
-- **Keep `isomorphic-git`, fix the Node usage**: swap `lightning-fs` (browser-only, wrong here) for plain `node:fs`, use `isomorphic-git/http/node`. `git.clone({fs: nodeFs, http, dir, url, depth: 1, onAuth})` — confirmed this covers shallow clone + token auth with zero system git binary, satisfying "standalone in any terminal."
-- **Also add a non-git fast path**: `.tar.gz` fetch + pure-JS extraction (`tar`/`fflate`) for the common "just copy a template" case — still zero native dependencies.
-- `init` pulls its template list from `GET https://devnoder-executor.srvel-build.workers.dev/templates` (live after Phase 7) — shared ecosystem, no repo merge (confirmed preference).
-- `deploy`: real `execSync('npx wrangler pages deploy dist ...')` instead of just printing it.
+Committed to `devnoder-cli`'s `claude/devnoder-handover-docs-834g2y` branch (commit `07d51c1`), pushed, no PR opened yet (ask before opening one).
+
+- **`init` no longer lies**: it previously did nothing but print "Project ready!" after a `sleep(800)` — no directory, no files, ever created. Now scaffolds a real, embedded React+Vite+TS starter (`src/templates/react-vite-ts.ts`) and refuses to touch a non-empty target directory instead of silently reporting success into it. Verified the generated project's `package.json`/`tsconfig.json`/`vite.config.ts` actually `npm install && npm run build` successfully — not just "files exist."
+- **`--repo <url>` replaces the old fake path**: `git.clone({fs, http, dir, url, depth: 1})` via `isomorphic-git` + plain `node:fs` + `isomorphic-git/http/node` — confirmed working end-to-end against a real public GitHub repo. Dropped `@isomorphic-git/lightning-fs` (browser/IndexedDB-only, was never even imported, silently would have produced an empty working directory under Node had anyone tried to wire it).
+- **Did not add** the `.tar.gz` fetch fast path or the `GET .../templates` executor integration from the original plan — both depend on Phase 7 infrastructure that isn't deployed anywhere reachable (confirmed: no source for `devnoder-executor` exists in any repo in scope, and the domain isn't confirmed live). Building against an unconfirmed live contract would risk the same "presented as done, isn't really" problem this whole roadmap exists to fix. Left as a documented follow-up once Phase 7 actually ships.
+- **`deploy`**: now really `execSync`s `wrangler pages deploy` instead of just printing the command; confirmed it now surfaces wrangler's own real `CLOUDFLARE_API_TOKEN` error instead of a fake success message.
+- **Found and fixed a bug not on the original list**: `doctor`'s `npm available`/`package.json` checks called `require()` inside a package that's `"type": "module"` and compiles to real ESM — `require` isn't defined there, so every run silently threw and was swallowed by the surrounding `try/catch`, making both checks always report `✗` regardless of the real state. Reproduced (`node dist/index.js doctor` reported both as missing in this exact repo, which has both) and confirmed fixed.
+- Also added the `.gitignore` this repo never had (`node_modules/`, `dist/`) and stopped `build`/`deploy` from crashing with a raw Node stack trace when the underlying command fails.
 
 ## Phase 9 — Secure Integrations Framework: "the door" (P1, new scope — this is the actual ask) ⚪ Not started
 
