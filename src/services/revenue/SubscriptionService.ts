@@ -1,4 +1,6 @@
 // SubscriptionService.ts — tiers, feature gates, $0 start
+const EXECUTOR_URL = 'https://devnoder-executor.srvel-build.workers.dev';
+
 export type Tier = 'free' | 'pro' | 'team';
 
 export interface Plan {
@@ -123,22 +125,45 @@ class SubscriptionService {
     return limit === Infinity || currentPeerCount < limit;
   }
 
-  /** Activate via a license key (validated server-side in prod) */
+  /** Activate via a license key, validated server-side against D1.
+   * The prefix/length check below is a fast-fail on obviously malformed
+   * input only — it is never the source of truth for whether a key is
+   * real, unlike the client-side-only check this replaces (which anyone
+   * could pass by typing "PRO-" followed by 16 characters). */
   async activateLicense(key: string): Promise<{ success: boolean; tier: Tier; message: string }> {
-    // Mock validation — in prod: POST to Cloudflare Worker → D1
-    if (key.startsWith('PRO-') && key.length === 20) {
-      this.tier = 'pro';
-      this.expiresAt = Date.now() + 365 * 86400000;
-      localStorage.setItem('devnoder-subscription', JSON.stringify({ tier: 'pro', expiresAt: this.expiresAt, key }));
-      return { success: true, tier: 'pro', message: 'Pro activated! Enjoy unlimited AI + all features.' };
+    const looksLikePro  = key.startsWith('PRO-')  && key.length === 20;
+    const looksLikeTeam = key.startsWith('TEAM-') && key.length === 21;
+    if (!looksLikePro && !looksLikeTeam) {
+      return { success: false, tier: 'free', message: 'Invalid license key format.' };
     }
-    if (key.startsWith('TEAM-') && key.length === 21) {
-      this.tier = 'team';
-      this.expiresAt = Date.now() + 365 * 86400000;
-      localStorage.setItem('devnoder-subscription', JSON.stringify({ tier: 'team', expiresAt: this.expiresAt, key }));
-      return { success: true, tier: 'team', message: 'Team plan activated!' };
+
+    try {
+      const res = await fetch(`${EXECUTOR_URL}/billing/validate-license`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+        signal: AbortSignal.timeout(8000),
+      });
+
+      if (res.status === 501) {
+        return { success: false, tier: 'free', message: 'License validation is not available yet.' };
+      }
+      if (!res.ok) {
+        return { success: false, tier: 'free', message: `Could not validate license (HTTP ${res.status}).` };
+      }
+
+      const data: { valid: boolean; tier: Tier; expiresAt: number; message?: string } = await res.json();
+      if (!data.valid) {
+        return { success: false, tier: 'free', message: data.message ?? 'Invalid license key.' };
+      }
+
+      this.tier = data.tier;
+      this.expiresAt = data.expiresAt;
+      localStorage.setItem('devnoder-subscription', JSON.stringify({ tier: data.tier, expiresAt: data.expiresAt, key }));
+      return { success: true, tier: data.tier, message: data.message ?? `${data.tier === 'team' ? 'Team' : 'Pro'} activated!` };
+    } catch (e: any) {
+      return { success: false, tier: 'free', message: `Could not reach license server: ${e.message}` };
     }
-    return { success: false, tier: 'free', message: 'Invalid license key.' };
   }
 
   deactivate() {

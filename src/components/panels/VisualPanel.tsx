@@ -13,7 +13,7 @@ export default function VisualPanel() {
         {(['web', 'flutter'] as const).map(m => (
           <button key={m} className={`visual-mode-btn ${mode === m ? 'active' : ''}`}
             onClick={() => setMode(m)}>
-            {m === 'web' ? '🌐 Web' : '🐦 Flutter'}
+            {m === 'web' ? '🌐 Web' : '🐦 Flutter (scaffold)'}
           </button>
         ))}
       </div>

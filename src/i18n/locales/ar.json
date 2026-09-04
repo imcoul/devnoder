@@ -49,5 +49,31 @@
     "testSkill": "اختبار",
     "saveSkill": "حفظ",
     "noSkills": "لا توجد مهارات"
+  },
+  "onboarding": {
+    "welcomeTitle": "مرحباً بك في DevNoder",
+    "yourProjectsTitle": "مشاريعك",
+    "welcomeSubtitle": "أنشئ مشروعاً للبدء — لا شيء مُعدّ بعد.",
+    "openSubtitle": "افتح مشروعاً موجوداً، أو ابدأ مشروعاً جديداً.",
+    "loading": "جارٍ تحميل المشاريع…",
+    "createBlank": "إنشاء مشروع فارغ",
+    "startFromTemplate": "البدء من قالب",
+    "cloneRepo": "استنساخ مستودع",
+    "projectName": "اسم المشروع",
+    "namePlaceholder": "مشروعي",
+    "chooseTemplate": "اختر قالباً",
+    "repoUrl": "رابط المستودع",
+    "accessToken": "رمز الوصول",
+    "accessTokenOptional": "(اختياري، للمستودعات الخاصة)",
+    "create": "إنشاء المشروع",
+    "creating": "جارٍ الإنشاء…",
+    "clone": "استنساخ المستودع",
+    "cloning": "جارٍ الاستنساخ…",
+    "cancel": "إلغاء",
+    "enterName": "أدخل اسم المشروع",
+    "chooseTemplateError": "اختر قالباً",
+    "enterUrl": "أدخل رابط المستودع",
+    "openProject": "فتح مشروع {{name}}",
+    "updated": "آخر تحديث {{date}}"
   }
 }

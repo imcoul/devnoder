@@ -263,20 +263,21 @@ export default function AIPanel() {
   return (
     <div className="ai-panel">
       <div className="ai-header">
-        <div className="agent-pills">
+        <div className="agent-pills" role="group" aria-label="AI agent">
           {AGENTS.map(a => (
             <button key={a.id} className={`agent-pill ${agentId === a.id ? 'active' : ''}`}
-              onClick={() => setAgentId(a.id)} title={a.description}>{a.icon}</button>
+              onClick={() => setAgentId(a.id)} title={a.description}
+              aria-pressed={agentId === a.id} aria-label={`${a.label} agent — ${a.description}`}>{a.icon}</button>
           ))}
         </div>
-        <select className="model-select" value={modelId} onChange={e => setModelId(e.target.value)}>
+        <select className="model-select" aria-label="AI model" value={modelId} onChange={e => setModelId(e.target.value)}>
           {MODELS.map(m => (
             <option key={m.id} value={m.id}>
               {m.label}{m.free ? ' ★' : ''}{m.id.startsWith('custom-') ? ' 🎯' : ''}
             </option>
           ))}
         </select>
-        <button className="ai-settings-btn" onClick={() => setShowSettings(s => !s)}>⚙</button>
+        <button className="ai-settings-btn" onClick={() => setShowSettings(s => !s)} aria-label="AI provider API keys">⚙</button>
       </div>
 
       {loadProgress && <div className="ai-load-progress">{loadProgress}</div>}
@@ -305,6 +306,7 @@ export default function AIPanel() {
 
       <div className="ai-input-area">
         <textarea ref={textareaRef} className="ai-textarea" value={input}
+          aria-label={`Message the ${AGENTS.find(a => a.id === agentId)?.label} agent`}
           onChange={e => setInput(e.target.value)} onKeyDown={onKeyDown}
           placeholder={`Ask the ${AGENTS.find(a => a.id === agentId)?.label} agent…`}
           rows={3} />
@@ -342,7 +344,7 @@ export default function AIPanel() {
           <div className="ai-settings-modal" onClick={e => e.stopPropagation()}>
             <div className="ai-settings-head">
               <span>API Keys</span>
-              <button onClick={() => setShowSettings(false)}>×</button>
+              <button onClick={() => setShowSettings(false)} aria-label="Close">×</button>
             </div>
             {[
               { id: 'groq', label: 'Groq (free)', placeholder: 'gsk_…', link: 'https://console.groq.com' },

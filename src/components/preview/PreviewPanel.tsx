@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useStore } from '@nanostores/react';
 import { $buffers, $activeBuffer } from '../../services/editor/BufferManager';
 import { previewService, PreviewLog, DeployResult, TunnelResult } from '../../services/preview/PreviewService';
+import { listFiles, readFile } from '../../services/git/GitService';
 import './PreviewPanel.css';
 
 type Tab = 'preview' | 'share' | 'deploy' | 'logs';
@@ -57,10 +58,17 @@ export default function PreviewPanel() {
   };
 
   const deploy = async () => {
-    if (!activeBuffer) return;
     setDeploying(true);
     try {
-      await previewService.deploy({ [activeBuffer.path || 'index.html']: activeBuffer.content });
+      // Deploy the real project file tree, not just whatever buffer happens
+      // to be open — a single active file was never a deployable site.
+      const paths = await listFiles();
+      const files: Record<string, string> = {};
+      for (const path of paths) {
+        try { files[path] = await readFile(path); } catch { /* skip unreadable */ }
+      }
+      if (Object.keys(files).length === 0) return;
+      await previewService.deploy(files);
       setHistory(previewService.getDeployHistory());
     } catch {}
     finally { setDeploying(false); }

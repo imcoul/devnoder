@@ -1,31 +1,60 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '@nanostores/react';
-import { $activePanel, $theme } from './stores/ui';
+import { $activePanel, $theme, setPanel } from './stores/ui';
 import { PanelShell } from './components/panels';
 import BottomNav from './components/layout/BottomNav';
 import CommandPalette from './components/layout/CommandPalette';
 import ToastContainer from './components/layout/ToastContainer';
 import { audioCueService } from './services/accessibility/AudioCueService';
+import { projectService } from './services/project/ProjectService';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 export default function App() {
   const activePanel = useStore($activePanel);
   const theme       = useStore($theme);
+  const [checkingProjects, setCheckingProjects] = useState(true);
+  const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
   useEffect(() => {
+    // First-run gate: if no project has ever been created, land on the
+    // onboarding panel. Otherwise resume whichever project was last active —
+    // GitService's active-project pointer is in-memory only and resets on
+    // every reload, so without this every reload would silently land in a
+    // nonexistent "default" directory instead of the user's real project.
+    projectService.resumeLastProject().then(resumed => {
+      if (!resumed) setPanel('onboarding');
+      setCheckingProjects(false);
+    }).catch(() => setCheckingProjects(false));
+  }, []);
+
+  useEffect(() => {
     audioCueService.load();
   }, []);
 
   useEffect(() => {
-    // Announce panel switch to screen reader / audio cue users
+    // Announce panel switch to screen reader / audio cue users, and actually
+    // move DOM focus there — the announcement alone doesn't help keyboard
+    // users, whose focus previously stayed wherever it was on the old panel.
     const label = activePanel.charAt(0).toUpperCase() + activePanel.slice(1);
     audioCueService.announcePanel(label);
+    mainRef.current?.focus();
   }, [activePanel]);
 
   useEffect(() => {
+    // Wire the real filesystem into services that were defined to accept
+    // one via setFS() but never actually got called — health metrics were
+    // silently fabricated instead of reporting "unavailable" as a result.
+    Promise.all([
+      import('./services/git/GitService'),
+      import('./services/health/ProjectHealthService'),
+    ]).then(([{ fs }, { projectHealthService }]) => {
+      projectHealthService.setFS(fs);
+    }).catch(console.warn);
+
     // Sprint 8 — seed built-in snippets
     import('./services/snippets/SnippetService')
       .then(m => m.snippetService.init())
@@ -55,6 +84,12 @@ export default function App() {
     import('./services/cloud/CloudTier')
       .then(m => { m.loadSubscription(); m.handleBillingCallback(); })
       .catch(console.warn);
+
+    // Health-check the executor Worker instead of hardcoding "unavailable" —
+    // reports false honestly until the Worker is actually deployed.
+    import('./services/terminal/CloudExecutor')
+      .then(m => m.cloudExecutor.checkAvailability())
+      .catch(console.warn);
   }, []);
 
   useEffect(() => {
@@ -71,14 +106,20 @@ export default function App() {
     }
   }, []);
 
+  if (checkingProjects) {
+    return <div className="app-root" aria-busy="true" />;
+  }
+
   return (
-    <div className="app-root">
-      <main className="app-main">
-        <PanelShell panelId={activePanel} />
-      </main>
-      <BottomNav />
-      <CommandPalette />
-      <ToastContainer />
-    </div>
+    <ErrorBoundary>
+      <div className="app-root">
+        <main className="app-main" ref={mainRef} tabIndex={-1}>
+          <PanelShell panelId={activePanel} />
+        </main>
+        {activePanel !== 'onboarding' && <BottomNav />}
+        <CommandPalette />
+        <ToastContainer />
+      </div>
+    </ErrorBoundary>
   );
 }

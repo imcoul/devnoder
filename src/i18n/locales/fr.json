@@ -49,5 +49,31 @@
     "testSkill": "Tester",
     "saveSkill": "Enregistrer",
     "noSkills": "Aucune compétence"
+  },
+  "onboarding": {
+    "welcomeTitle": "Bienvenue sur DevNoder",
+    "yourProjectsTitle": "Vos projets",
+    "welcomeSubtitle": "Créez un projet pour commencer — rien n'est encore configuré.",
+    "openSubtitle": "Ouvrez un projet existant, ou commencez-en un nouveau.",
+    "loading": "Chargement des projets…",
+    "createBlank": "Créer un projet vide",
+    "startFromTemplate": "Démarrer depuis un modèle",
+    "cloneRepo": "Cloner un dépôt",
+    "projectName": "Nom du projet",
+    "namePlaceholder": "mon-projet",
+    "chooseTemplate": "Choisir un modèle",
+    "repoUrl": "URL du dépôt",
+    "accessToken": "Jeton d'accès",
+    "accessTokenOptional": "(optionnel, pour les dépôts privés)",
+    "create": "Créer le projet",
+    "creating": "Création…",
+    "clone": "Cloner le dépôt",
+    "cloning": "Clonage…",
+    "cancel": "Annuler",
+    "enterName": "Entrez un nom de projet",
+    "chooseTemplateError": "Choisissez un modèle",
+    "enterUrl": "Entrez l'URL d'un dépôt",
+    "openProject": "Ouvrir le projet {{name}}",
+    "updated": "Mis à jour le {{date}}"
   }
 }

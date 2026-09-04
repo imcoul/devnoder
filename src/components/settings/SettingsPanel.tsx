@@ -61,11 +61,10 @@ export default function SettingsPanel() {
   };
 
   const setLanguage = (id: Lang) => {
-    $lang.set(id);
+    // i18n's languageChanged listener (src/i18n/index.ts) updates $lang,
+    // document.dir/lang, and the persisted preference — single source of
+    // truth instead of duplicating that logic here.
     i18n.changeLanguage(id);
-    document.documentElement.lang = id;
-    document.documentElement.dir = LANGS.find(l => l.id === id)?.dir ?? 'ltr';
-    localStorage.setItem('devnoder-lang', id);
   };
 
   const saveEditorSettings = () => {

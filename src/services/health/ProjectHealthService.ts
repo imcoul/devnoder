@@ -1,5 +1,17 @@
 // ProjectHealthService.ts — zero-telemetry local project analysis
 import Dexie, { Table } from 'dexie';
+import { getDir } from '../git/GitService';
+
+function unavailableReport(): HealthReport {
+  return {
+    overall: 0,
+    grade: 'F',
+    metrics: [],
+    generatedAt: Date.now(),
+    projectName: '—',
+    unavailable: true,
+  };
+}
 
 export interface HealthMetric {
   id: string;
@@ -18,6 +30,10 @@ export interface HealthReport {
   metrics: HealthMetric[];
   generatedAt: number;
   projectName: string;
+  /** True when no filesystem handle was available to analyse — every field
+   * above is a placeholder, not a real measurement. Render this state
+   * honestly; never fall back to fabricated numbers that look real. */
+  unavailable?: boolean;
 }
 
 // ─── Lightweight FS shim (matches lightning-fs API used in GitService) ────────
@@ -91,7 +107,9 @@ export class ProjectHealthService {
   /** Call once with lightning-fs instance from GitService */
   setFS(fs: any) { this.fs = fs; }
 
-  async analyse(projectRoot = '/devnoder'): Promise<HealthReport> {
+  async analyse(projectRoot = getDir()): Promise<HealthReport> {
+    if (!this.fs) return unavailableReport();
+
     const metrics: HealthMetric[] = [];
     const fs = this.fs;
 
@@ -102,7 +120,7 @@ export class ProjectHealthService {
     let hasLicense = false;
     let hasDescription = false;
 
-    if (fs) {
+    {
       const pkgText = await readText(`${projectRoot}/package.json`, fs);
       try {
         pkg = JSON.parse(pkgText);
@@ -111,38 +129,27 @@ export class ProjectHealthService {
         hasLicense = !!pkg.license;
         hasDescription = !!pkg.description;
       } catch { /* not found or malformed */ }
-    } else {
-      // fallback: use known manifest
-      depCount = 32; devDepCount = 5; hasLicense = true; hasDescription = true;
     }
 
     // ── 2. File scan ────────────────────────────────────────────────────────
-    let allFiles: string[] = [];
     let todoCount = 0;
     let fixmeCount = 0;
     let consoleCount = 0;
     let largeFileCount = 0;
     let estimatedBundleKB = 0;
 
-    if (fs) {
-      allFiles = await listFiles(`${projectRoot}/src`, fs);
-      for (const file of allFiles) {
-        if (!file.match(/\.(ts|tsx|js|jsx|css)$/)) continue;
-        const text = await readText(file, fs);
-        todoCount  += (text.match(/\/\/\s*TODO/gi) ?? []).length;
-        fixmeCount += (text.match(/\/\/\s*FIXME/gi) ?? []).length;
-        consoleCount += (text.match(/console\.(log|warn|error|debug)/g) ?? []).length;
-        try {
-          const stat = await fs.promises.stat(file);
-          if (stat.size > 80_000) largeFileCount++;
-          estimatedBundleKB += Math.round(stat.size / 1024);
-        } catch { /* skip */ }
-      }
-    } else {
-      // estimates based on known codebase
-      allFiles = new Array(61).fill('');
-      todoCount = 3; fixmeCount = 1; consoleCount = 12;
-      estimatedBundleKB = 820; largeFileCount = 0;
+    const allFiles = await listFiles(`${projectRoot}/src`, fs);
+    for (const file of allFiles) {
+      if (!file.match(/\.(ts|tsx|js|jsx|css)$/)) continue;
+      const text = await readText(file, fs);
+      todoCount  += (text.match(/\/\/\s*TODO/gi) ?? []).length;
+      fixmeCount += (text.match(/\/\/\s*FIXME/gi) ?? []).length;
+      consoleCount += (text.match(/console\.(log|warn|error|debug)/g) ?? []).length;
+      try {
+        const stat = await fs.promises.stat(file);
+        if (stat.size > 80_000) largeFileCount++;
+        estimatedBundleKB += Math.round(stat.size / 1024);
+      } catch { /* skip */ }
     }
 
     // ── 3. Git info (from localStorage or GitService store) ────────────────
@@ -170,14 +177,13 @@ export class ProjectHealthService {
     }
 
     // ── 5. Tests ───────────────────────────────────────────────────────────
-    let testFileCount = allFiles.filter(f => f.match(/\.(test|spec)\.(ts|tsx|js)$/)).length;
-    let srcFileCount = allFiles.filter(f => f.match(/\.tsx?$/) && !f.match(/\.(test|spec)\./)).length;
-    if (!fs) { testFileCount = 0; srcFileCount = 61; }
+    const testFileCount = allFiles.filter(f => f.match(/\.(test|spec)\.(ts|tsx|js)$/)).length;
+    const srcFileCount = allFiles.filter(f => f.match(/\.tsx?$/) && !f.match(/\.(test|spec)\./)).length;
     const testCoverage = srcFileCount > 0 ? Math.min(100, Math.round((testFileCount / srcFileCount) * 100 * 5)) : 0;
 
     // ── 6. i18n ────────────────────────────────────────────────────────────
     let i18nScore = 100;
-    if (fs) {
+    {
       const en = await readText(`${projectRoot}/src/i18n/locales/en.json`, fs);
       const fr = await readText(`${projectRoot}/src/i18n/locales/fr.json`, fs);
       const ar = await readText(`${projectRoot}/src/i18n/locales/ar.json`, fs);

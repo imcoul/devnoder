@@ -3,6 +3,8 @@ import React, { lazy, Suspense, ComponentType } from 'react';
 export { default as CommandPalette } from '../layout/CommandPalette';
 export { default as BottomNav }      from '../layout/BottomNav';
 
+export const OnboardingPanel = lazy(() => import('../onboarding/OnboardingPanel'));
+
 // Sprints 1–8
 export const CodePanel      = lazy(() => import('./CodePanel'));
 export const VisualPanel    = lazy(() => import('./VisualPanel'));
@@ -40,6 +42,7 @@ export interface PanelMeta {
 }
 
 export const PANELS: PanelMeta[] = [
+  { id: 'onboarding', label: 'Projects',      icon: '📁', component: OnboardingPanel, nav: false, sprint: 0 },
   { id: 'code',      label: 'Code Editor',    icon: '💻', component: CodePanel,      nav: true,  shortcut: '1', sprint: 1 },
   { id: 'visual',    label: 'Visual Editor',  icon: '🎨', component: VisualPanel,    nav: true,  shortcut: '2', sprint: 2 },
   { id: 'terminal',  label: 'Terminal',       icon: '⌨',  component: TerminalPanel,  nav: true,  shortcut: '3', sprint: 3 },

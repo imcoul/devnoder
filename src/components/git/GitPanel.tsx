@@ -112,9 +112,10 @@ export default function GitPanel() {
   return (
     <div className="git-panel">
       {/* Tab bar */}
-      <div className="git-tabs">
+      <div className="git-tabs" role="tablist" aria-label="Git">
         {(['changes','log','branches','prs','issues','ci'] as Tab[]).map(t => (
-          <button key={t} className={`git-tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
+          <button key={t} className={`git-tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}
+            role="tab" aria-selected={tab === t}>
             {t === 'changes'  && `Changes ${status.filter(f=>f.status!=='unmodified').length ? `(${status.filter(f=>f.status!=='unmodified').length})` : ''}`}
             {t === 'log'      && 'Log'}
             {t === 'branches' && 'Branches'}
@@ -137,9 +138,9 @@ export default function GitPanel() {
           </div>
           {staged.map(f => (
             <div key={f.path} className="git-file-row" onClick={() => openFile(f.path)}>
-              <span className="git-file-status" style={{color: statusColor(f.status)}}>{statusIcon(f.status)}</span>
+              <span className="git-file-status" style={{color: statusColor(f.status)}} aria-hidden="true">{statusIcon(f.status)}</span>
               <span className="git-file-path">{f.path}</span>
-              <button className="git-file-btn" onClick={e=>{e.stopPropagation();unstage(f.path);}}>−</button>
+              <button className="git-file-btn" aria-label={`Unstage ${f.path}`} onClick={e=>{e.stopPropagation();unstage(f.path);}}>−</button>
             </div>
           ))}
           {staged.length === 0 && <p className="git-empty">No staged changes</p>}
@@ -151,9 +152,9 @@ export default function GitPanel() {
           </div>
           {unstaged.map(f => (
             <div key={f.path} className="git-file-row" onClick={() => openFile(f.path)}>
-              <span className="git-file-status" style={{color: statusColor(f.status)}}>{statusIcon(f.status)}</span>
+              <span className="git-file-status" style={{color: statusColor(f.status)}} aria-hidden="true">{statusIcon(f.status)}</span>
               <span className="git-file-path">{f.path}</span>
-              <button className="git-file-btn git-file-btn--add" onClick={e=>{e.stopPropagation();stage(f.path);}}>+</button>
+              <button className="git-file-btn git-file-btn--add" aria-label={`Stage ${f.path}`} onClick={e=>{e.stopPropagation();stage(f.path);}}>+</button>
             </div>
           ))}
           {unstaged.length === 0 && <p className="git-empty">No unstaged changes</p>}
@@ -161,11 +162,12 @@ export default function GitPanel() {
           {/* Commit */}
           <div className="git-commit-box">
             <div className="git-commit-input-row">
-              <input className="git-commit-input" value={commitMsg}
+              <input className="git-commit-input" value={commitMsg} aria-label="Commit message"
                 onChange={e => setCommitMsg(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && !e.shiftKey && doCommit()}
                 placeholder="Commit message (feat: …)" />
-              <button className="git-ai-btn" onClick={aiMessage} disabled={generating} title="AI suggest">
+              <button className="git-ai-btn" onClick={aiMessage} disabled={generating}
+                aria-label="AI suggest commit message" title="AI suggest">
                 {generating ? '…' : '✨'}
               </button>
             </div>
@@ -206,7 +208,7 @@ export default function GitPanel() {
       {tab === 'branches' && (
         <div className="git-body">
           <div className="git-new-branch">
-            <input className="git-branch-input" value={newBranch}
+            <input className="git-branch-input" value={newBranch} aria-label="New branch name"
               onChange={e => setNewBranch(e.target.value)}
               placeholder="new-branch-name" />
             <button className="git-commit-btn" style={{marginBlockStart:0}}
@@ -217,7 +219,7 @@ export default function GitPanel() {
           </div>
           {branches.map(b => (
             <div key={b.name} className={`git-branch-row ${b.current ? 'current' : ''}`}>
-              <span className="git-branch-indicator">{b.current ? '●' : '○'}</span>
+              <span className="git-branch-indicator" aria-hidden="true">{b.current ? '●' : '○'}</span>
               <span className="git-branch-name">{b.name}</span>
               {!b.current && (
                 <button className="git-link" onClick={async () => { await checkoutBranch(b.name); refresh(); }}>
@@ -263,7 +265,7 @@ export default function GitPanel() {
               ? <p className="git-empty">No workflow runs found</p>
               : ciRuns.map(run => (
                   <a key={run.id} className="git-pr-row" href={run.html_url} target="_blank" rel="noopener noreferrer">
-                    <span className={`git-ci-dot git-ci-dot--${run.conclusion ?? run.status}`} />
+                    <span className={`git-ci-dot git-ci-dot--${run.conclusion ?? run.status}`} aria-hidden="true" />
                     <div style={{flex:1,minInlineSize:0}}>
                       <div className="git-pr-title">{run.name}</div>
                       <div className="git-log-meta">

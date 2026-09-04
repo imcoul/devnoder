@@ -42,6 +42,38 @@
 .mcp-toggle input:checked + .mcp-toggle-track::before { transform:translateX(0.9rem); }
 .mcp-del-btn { background:none; border:none; color:var(--color-text-muted); cursor:pointer; font-size:0.85rem; padding:0.1rem; }
 .mcp-del-btn:hover { color:var(--color-error); }
+.mcp-detail-btn { background:none; border:none; color:var(--color-text-muted); cursor:pointer; font-size:0.85rem; padding:0.1rem; }
+.mcp-detail-btn:hover, .mcp-detail-btn[aria-expanded="true"] { color:var(--color-turquoise); }
+.mcp-capability-badge { font-size:0.62rem; background:#40E0D015; border:1px solid var(--color-turquoise); border-radius:0.2rem; padding:0.05rem 0.3rem; color:var(--color-turquoise); text-transform:capitalize; }
+
+/* Connection identity (Phase 9) */
+.mcp-server-row-wrap { border-block-end:1px solid var(--color-border); }
+.mcp-server-row-wrap .mcp-server-row { border-block-end:none; }
+.mcp-identity-block { padding:0.5rem 0.6rem 0.7rem 2.3rem; display:flex; flex-direction:column; gap:0.4rem; background:var(--color-surface); }
+.mcp-identity-desc { font-size:0.68rem; color:var(--color-text-muted); line-height:1.4; }
+.mcp-identity-actions { display:flex; align-items:center; gap:0.5rem; }
+.mcp-identity-status { font-size:0.75rem; color:var(--color-turquoise); }
+
+/* Consent step (Phase 9) */
+.mcp-consent-overlay { position:fixed; inset:0; background:#00000080; display:grid; place-items:center; z-index:100; padding:1rem; }
+.mcp-consent-modal { background:var(--color-canvas); border:1px solid var(--color-border); border-radius:0.5rem; padding:1rem; max-inline-size:26rem; inline-size:100%; display:flex; flex-direction:column; gap:0.7rem; }
+.mcp-consent-head { display:flex; align-items:center; gap:0.6rem; font-size:1.3rem; }
+.mcp-consent-name { font-size:0.9rem; font-weight:700; color:var(--color-text); }
+.mcp-consent-sub  { font-size:0.72rem; color:var(--color-text-muted); }
+.mcp-consent-caps { display:flex; flex-direction:column; gap:0.4rem; }
+.mcp-consent-cap  { display:flex; align-items:center; gap:0.5rem; font-size:0.8rem; cursor:pointer; }
+.mcp-consent-warning { font-size:0.72rem; color:var(--color-warn); }
+.mcp-consent-actions { display:flex; justify-content:flex-end; gap:0.5rem; }
+
+/* Audit log tab (Phase 9) */
+.mcp-audit-row { display:flex; align-items:flex-start; gap:0.5rem; padding:0.5rem 0.7rem; border-block-end:1px solid var(--color-border); }
+.mcp-audit-badge { font-size:0.62rem; font-weight:700; text-transform:uppercase; border-radius:0.2rem; padding:0.1rem 0.35rem; flex-shrink:0; margin-block-start:0.1rem; }
+.mcp-audit-badge--allowed { background:#22c55e20; color:var(--color-success); }
+.mcp-audit-badge--denied  { background:#ef444420; color:var(--color-error); }
+.mcp-audit-badge--error   { background:#f59e0b20; color:var(--color-warn); }
+.mcp-audit-info { flex:1; min-inline-size:0; }
+.mcp-audit-tool { font-size:0.8rem; font-weight:600; font-family:var(--font-code); }
+.mcp-audit-meta { font-size:0.68rem; color:var(--color-text-muted); }
 
 /* Tools tab */
 .mcp-tool-row { padding:0.5rem 0.7rem; border-block-end:1px solid var(--color-border); display:flex; flex-direction:column; gap:0.15rem; }

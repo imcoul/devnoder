@@ -117,6 +117,14 @@ export default function CommunityPanel() {
         ))}
       </div>
 
+      {tab !== 'compute' && (
+        <div role="note" style={{ padding:'0.4rem 0.7rem', fontSize:'0.72rem', lineHeight:1.4,
+          color:'var(--color-text-muted)', background:'var(--color-surface)',
+          borderBlockEnd:'1px solid var(--color-border)' }}>
+          Registry preview — {tab} aren't fetched from a live server yet, so nothing below can actually be installed for real.
+        </div>
+      )}
+
       {/* ── Plugins ── */}
       {tab === 'plugins' && (
         <div className="community-body">
