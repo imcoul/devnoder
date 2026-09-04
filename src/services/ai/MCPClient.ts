@@ -216,6 +216,14 @@ class MCPClient {
     const existing = this.connections.get(config.id);
     if (existing?.connected) return existing;
 
+    // A connection the user never granted any capability to (consent step
+    // skipped, or explicitly revoked down to nothing) doesn't get to talk to
+    // anything — capabilities are an enforced gate here, not just a label
+    // shown once in the Add-Server UI.
+    if (!config.capabilities?.length) {
+      throw new Error(`${config.name}: no capabilities granted — nothing to connect for`);
+    }
+
     const transport = this.makeTransport(config);
     const conn: MCPConnection = { config, transport, tools: [], connected: false };
     this.connections.set(config.id, conn);
@@ -279,14 +287,40 @@ class MCPClient {
 
   async callTool(req: ToolCallRequest): Promise<ToolCallResult> {
     const conn = this.connections.get(req.serverId);
-    if (!conn?.connected) throw new Error(`Server ${req.serverId} not connected`);
+    const argKeys = Object.keys(req.args ?? {});
 
-    const result = await conn.transport.call('tools/call', {
-      name: req.toolName,
-      arguments: req.args,
-    }) as ToolCallResult;
+    if (!conn?.connected) {
+      await mcpConfigStore.logAudit({
+        serverId: req.serverId, serverName: conn?.config.name ?? req.serverId,
+        toolName: req.toolName, argKeys, outcome: 'denied', detail: 'not connected',
+      });
+      throw new Error(`Server ${req.serverId} not connected`);
+    }
+    if (!conn.config.capabilities?.length) {
+      await mcpConfigStore.logAudit({
+        serverId: req.serverId, serverName: conn.config.name,
+        toolName: req.toolName, argKeys, outcome: 'denied', detail: 'no capabilities granted',
+      });
+      throw new Error(`${conn.config.name}: no capabilities granted — refusing tool call`);
+    }
 
-    return result;
+    try {
+      const result = await conn.transport.call('tools/call', {
+        name: req.toolName,
+        arguments: req.args,
+      }) as ToolCallResult;
+      await mcpConfigStore.logAudit({
+        serverId: req.serverId, serverName: conn.config.name,
+        toolName: req.toolName, argKeys, outcome: 'allowed',
+      });
+      return result;
+    } catch (e: any) {
+      await mcpConfigStore.logAudit({
+        serverId: req.serverId, serverName: conn.config.name,
+        toolName: req.toolName, argKeys, outcome: 'error', detail: e.message,
+      });
+      throw e;
+    }
   }
 
   // Convert MCP tool schema to Anthropic/OpenAI tool format
