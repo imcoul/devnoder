@@ -143,7 +143,7 @@ function ConsentStep({ draft, onConfirm, onCancel }: {
   const flip = (cap: MCPCapability) => {
     setGranted(prev => {
       const next = new Set(prev);
-      next.has(cap) ? next.delete(cap) : next.add(cap);
+      if (next.has(cap)) next.delete(cap); else next.add(cap);
       return next;
     });
   };
