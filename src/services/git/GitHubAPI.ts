@@ -1,8 +1,7 @@
 // GitHubAPI.ts — PRs, Issues, CI status, OAuth token exchange
-const OAUTH_WORKER = 'https://devnoder-oauth.srvel-build.workers.dev';
+const OAUTH_WORKER = 'https://devnoder-oauth.ibrahimmamadoucoulibaly.workers.dev';
 const API = 'https://api.github.com';
-// MANUAL: replace with your GitHub OAuth App client ID
-const CLIENT_ID = 'REPLACE_WITH_GITHUB_OAUTH_CLIENT_ID';
+const CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID ?? 'Ov23liHoswnxGH0oVEbS';
 
 export interface GHRepo { owner: string; repo: string; }
 export interface PullRequest {

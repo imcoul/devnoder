@@ -14,3 +14,17 @@ declare module 'qrcode-svg' {
   }
   export = QRCode;
 }
+
+declare module '../../../devnoder-executor/index.js' {
+  const worker: {
+    fetch(request: Request, env?: Record<string, unknown>): Promise<Response>;
+  };
+  export default worker;
+}
+
+declare module '../../../devnoder-oauth/index.js' {
+  const worker: {
+    fetch(request: Request, env?: Record<string, string>): Promise<Response>;
+  };
+  export default worker;
+}
