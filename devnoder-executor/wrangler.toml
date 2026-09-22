@@ -6,3 +6,12 @@ compatibility_date = "2026-06-01"
 enabled = true
 logs = { enabled = true }
 traces = { enabled = true }
+
+[[durable_objects.bindings]]
+name = "Sandbox"
+class_name = "Sandbox"
+script_name = "devnoder-executor"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["Sandbox"]

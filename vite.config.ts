@@ -40,6 +40,7 @@ export default defineConfig({
       '@php-wasm/web-8-0',
       '@php-wasm/web-7-4',
       '@php-wasm/universal',
+      '@cloudflare/sandbox',
     ],
   },
   ssr: {
@@ -53,6 +54,7 @@ export default defineConfig({
       '@php-wasm/web-8-0',
       '@php-wasm/web-7-4',
       '@php-wasm/universal',
+      '@cloudflare/sandbox',
     ],
   },
   build: {
@@ -67,6 +69,8 @@ export default defineConfig({
         '@php-wasm/web-8-0',
         '@php-wasm/web-7-4',
         '@php-wasm/universal',
+        '@cloudflare/sandbox',
+        'cloudflare:workers',
       ],
     },
   },
