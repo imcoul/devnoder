@@ -2,5 +2,10 @@ name = "devnoder-oauth"
 main = "index.js"
 compatibility_date = "2026-06-01"
 
+[observability]
+enabled = true
+logs = { enabled = true }
+traces = { enabled = true }
+
 [vars]
 GITHUB_CLIENT_ID = "Ov23liHoswnxGH0oVEbS"
