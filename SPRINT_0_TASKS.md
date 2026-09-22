@@ -35,9 +35,9 @@ optimizeDeps: {
 ```
 
 ### Acceptance
-- [ ] `npm run build` succeeds
-- [ ] `npm run dev` terminal PHP still works
-- [ ] No TypeScript errors
+- [x] `npm run build` succeeds
+- [x] `npm run dev` terminal PHP still works
+- [x] No TypeScript errors
 
 ### Files to Modify
 - `package.json`
@@ -138,10 +138,10 @@ const x = getService('x');
 ```
 
 ### Acceptance
-- [ ] All 25+ services registered
-- [ ] `registry.reset()` works in tests
-- [ ] No circular import errors
-- [ ] Dev server works
+- [x] All 25+ services registered
+- [x] `registry.reset()` works in tests
+- [x] No circular import errors
+- [x] Dev server works
 
 ### Files to Modify
 - `src/services/registry.ts` (new)
@@ -216,9 +216,9 @@ export function updateProjectContext(patch: Partial<ProjectContext>) {
 - `MCPClient` → subscribes, connects project-scoped servers
 
 ### Acceptance
-- [ ] Project switch updates all services atomically
-- [ ] No stale state after switch
-- [ ] Backward-compatible atoms work for existing components
+- [x] Project switch updates all services atomically
+- [x] No stale state after switch
+- [x] Backward-compatible atoms work for existing components
 
 ### Files to Modify
 - `src/stores/projectContext.ts` (new)
@@ -339,10 +339,10 @@ const vfs = createVirtualFS(record.id);
 ```
 
 ### Acceptance
-- [ ] Single source of truth for file content
-- [ ] Git operations work on same FS as editor
-- [ ] Changes emit events for sync/RAG/AI
-- [ ] No data loss on project switch
+- [x] Single source of truth for file content
+- [x] Git operations work on same FS as editor
+- [x] Changes emit events for sync/RAG/AI
+- [x] No data loss on project switch
 
 ### Files to Modify
 - `src/services/fs/VirtualFS.ts` (new)
@@ -502,10 +502,10 @@ jobs:
 ```
 
 ### Acceptance
-- [ ] `npm test` passes locally
-- [ ] CI runs on every PR
-- [ ] Coverage thresholds enforced on services
-- [ ] 5+ service tests passing
+- [x] `npm test` passes locally
+- [x] CI runs on every PR
+- [x] Coverage thresholds enforced on services
+- [x] 5+ service tests passing
 
 ### Files to Create/Modify
 - `vitest.config.ts` (enhance)
@@ -521,14 +521,14 @@ jobs:
 
 ## Sprint 0 Definition of Done
 
-- [ ] `npm run build` passes
-- [ ] `npm run dev` works
-- [ ] `npm test` passes with >80% service coverage
-- [ ] CI pipeline green
-- [ ] Service registry handles all 25+ services
-- [ ] ProjectContext is single source of truth
-- [ ] VirtualFS unifies editor + git filesystem
-- [ ] All tasks have tests
+- [x] `npm run build` passes
+- [x] `npm run dev` works
+- [x] `npm test` passes with >80% service coverage
+- [x] CI pipeline green
+- [x] Service registry handles all 25+ services
+- [x] ProjectContext is single source of truth
+- [x] VirtualFS unifies editor + git filesystem
+- [x] All tasks have tests
 
 ---
 
