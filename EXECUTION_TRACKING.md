@@ -74,8 +74,17 @@ Track every change with:
 
 ### Added
 - Service registry pattern (2026-09-22, @team)
-  - Files: src/services/registry.ts, all service files
-  - Revert: git revert 2ff8226
+  - Files: src/services/registry.ts, src/services/register.ts
+  - Revert: git revert 60cf1d1
+- ProjectContext store (2026-09-22, @team)
+  - Files: src/stores/projectContext.ts, src/services/project/ProjectService.ts
+  - Revert: git revert c4c6089
+- VirtualFS abstraction (2026-09-22, @team)
+  - Files: src/services/fs/VirtualFS.ts
+  - Revert: git revert f882168
+- Test infrastructure (2026-09-22, @team)
+  - Files: vitest.config.ts, .github/workflows/test.yml, 5 test files
+  - Revert: git revert d636fbf
 
 ### Changed
 - OAuth Worker URL now configurable (2026-09-22, @team)
@@ -266,26 +275,25 @@ Labels:
 #### Weekly Status Email
 
 ```markdown
-Subject: DevNoder Weekly Status — Sprint 0 Week 1
+Subject: DevNoder Weekly Status — Sprint 0 Week 2
 
 ## Completed
-- [x] Service registry (commit 2ff8226)
-- [x] Crypto polyfill (commit 2ff8226)
+- [x] Service registry (commit 60cf1d1)
+- [x] Crypto polyfill + utilities (commit 2ff8226, d636fbf)
+- [x] ProjectContext store (commit c4c6089)
+- [x] VirtualFS abstraction (commit f882168)
+- [x] Test infrastructure: vitest config, CI workflow, 5 tests (commit d636fbf)
 
 ## In Progress
-- [ ] VirtualFS (70% complete, on track)
-- [ ] Test infrastructure (50% complete, blocked on VirtualFS)
-
-## Blocked
-- VirtualFS → Test infrastructure dependency
+- None — Sprint 0 tasks complete
 
 ## Next Week
-- Complete VirtualFS
-- Start ProjectContext
-- Begin OSS evaluation: Cloudflare Sandbox SDK
+- Sprint 1: Cloudflare Sandbox SDK evaluation
+- Sprint 1: y-codemirror.next + Hocuspocus OSS adoption
+- Sprint 1: Real PTY terminal
 
 ## Risks
-- php-wasm build fix not yet implemented (P0 blocker)
+- php-wasm build fix still shows build warnings (not blocking)
 ```
 
 ### 8. Emergency Procedures
