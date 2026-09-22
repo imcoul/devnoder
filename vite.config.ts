@@ -32,18 +32,42 @@ export default defineConfig({
     exclude: [
       '@mlc-ai/web-llm',
       '@php-wasm/web',
+      '@php-wasm/web-8-5',
       '@php-wasm/web-8-4',
       '@php-wasm/web-8-3',
       '@php-wasm/web-8-2',
       '@php-wasm/web-8-1',
       '@php-wasm/web-8-0',
       '@php-wasm/web-7-4',
+      '@php-wasm/universal',
     ],
   },
   ssr: {
     external: [
       '@php-wasm/web',
+      '@php-wasm/web-8-5',
+      '@php-wasm/web-8-4',
+      '@php-wasm/web-8-3',
+      '@php-wasm/web-8-2',
+      '@php-wasm/web-8-1',
+      '@php-wasm/web-8-0',
       '@php-wasm/web-7-4',
+      '@php-wasm/universal',
     ],
+  },
+  build: {
+    rollupOptions: {
+      external: [
+        '@php-wasm/web',
+        '@php-wasm/web-8-5',
+        '@php-wasm/web-8-4',
+        '@php-wasm/web-8-3',
+        '@php-wasm/web-8-2',
+        '@php-wasm/web-8-1',
+        '@php-wasm/web-8-0',
+        '@php-wasm/web-7-4',
+        '@php-wasm/universal',
+      ],
+    },
   },
 });
