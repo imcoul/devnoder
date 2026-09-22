@@ -50,6 +50,10 @@ class RegistryImpl implements ServiceRegistry {
 
 export const registry = new RegistryImpl();
 
+export function createRegistry(): ServiceRegistry {
+  return new RegistryImpl();
+}
+
 export function registerService(key: string, factory: Factory) {
   registry.register(key, factory);
 }
