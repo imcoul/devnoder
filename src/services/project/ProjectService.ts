@@ -7,6 +7,7 @@ import {
 } from '../git/GitService';
 import { templateService } from '../templates/TemplateService';
 import { bufferManager } from '../editor/BufferManager';
+import { setProjectContext, createProjectContext } from '../../stores/projectContext';
 
 export interface CreateProjectOptions {
   templateId?: string;
@@ -41,14 +42,17 @@ export const projectService = {
     const lastId = await getSetting(LAST_ACTIVE_KEY, '');
     if (lastId) {
       const record = await db.projects.get(lastId);
-      if (record) { setActiveProject(record.id); return record; }
+      if (record) {
+        setActiveProject(record.id);
+        setProjectContext(createProjectContext(record));
+        return record;
+      }
     }
-    // Persisted id is missing or was deleted — fall back to the most
-    // recently updated project rather than silently starting empty.
     const [mostRecent] = await this.listProjects();
     if (mostRecent) {
       setActiveProject(mostRecent.id);
       await setSetting(LAST_ACTIVE_KEY, mostRecent.id);
+      setProjectContext(createProjectContext(mostRecent));
       return mostRecent;
     }
     return null;
@@ -60,6 +64,7 @@ export const projectService = {
     bufferManager.closeAllBuffers();
     setActiveProject(record.id);
     await setSetting(LAST_ACTIVE_KEY, record.id);
+    setProjectContext(createProjectContext(record));
     await initRepo();
 
     if (options.templateId) {
@@ -84,6 +89,7 @@ export const projectService = {
     setActiveProject(id);
     await setSetting(LAST_ACTIVE_KEY, id);
     await db.projects.put({ ...record, updatedAt: Date.now() });
+    setProjectContext(createProjectContext({ ...record, updatedAt: Date.now() }));
     await initRepo();
   },
 
@@ -93,6 +99,7 @@ export const projectService = {
     bufferManager.closeAllBuffers();
     setActiveProject(record.id);
     await setSetting(LAST_ACTIVE_KEY, record.id);
+    setProjectContext(createProjectContext(record));
     await clone(url, token);
     return record;
   },

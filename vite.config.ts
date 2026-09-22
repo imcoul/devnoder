@@ -39,6 +39,7 @@ export default defineConfig({
       '@php-wasm/web-8-1',
       '@php-wasm/web-8-0',
       '@php-wasm/web-7-4',
+      '@php-wasm/universal',
     ],
   },
   ssr: {
@@ -51,6 +52,7 @@ export default defineConfig({
       '@php-wasm/web-8-1',
       '@php-wasm/web-8-0',
       '@php-wasm/web-7-4',
+      '@php-wasm/universal',
     ],
   },
   build: {
