@@ -1,38 +1,62 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { cloudExecutor, type CloudResult } from '../terminal/CloudExecutor';
 
-import executorWorker from '../../../devnoder-executor/index.js';
-import oauthWorker from '../../../devnoder-oauth/index.js';
+vi.mock('@cloudflare/sandbox', () => ({
+  getSandbox: vi.fn(() => ({
+    exec: vi.fn(),
+    tunnels: { get: vi.fn() },
+  })),
+  proxyToSandbox: vi.fn(async () => null),
+  Sandbox: class Sandbox {},
+}));
 
-const json = async (response: Response) => response.json();
-
-describe('phase 7 worker contracts', () => {
-  it('exposes a real health endpoint on the executor worker', async () => {
-    const response = await executorWorker.fetch(new Request('https://example.test/health'));
-    expect(response.status).toBe(200);
-    await expect(json(response)).resolves.toMatchObject({ status: 'ok' });
+describe('CloudExecutor', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    cloudExecutor.available = false;
+    cloudExecutor.lastChecked = 0;
+    cloudExecutor.sandboxReady = false;
+    cloudExecutor.sandboxInstance = null;
   });
 
-  it('returns an honest 501 for unimplemented executor actions until secrets are configured', async () => {
-    const response = await executorWorker.fetch(new Request('https://example.test/execute', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: 'print(1)', language: 'python' }),
-    }));
-    expect(response.status).toBe(501);
-    await expect(json(response)).resolves.toMatchObject({ error: expect.stringMatching(/not configured|not implemented/i) });
+  it('starts unavailable by default', async () => {
+    const result = await cloudExecutor.run('print(1)', 'python');
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('not deployed');
   });
 
-  it('exposes health and validates the oauth token route contract', async () => {
-    const health = await oauthWorker.fetch(new Request('https://example.test/health'));
-    expect(health.status).toBe(200);
-    await expect(json(health)).resolves.toMatchObject({ status: 'ok', configured: false });
+  it('checkAvailability probes fallback worker', async () => {
+    global.fetch = vi.fn(() =>
+      Promise.resolve(new Response(JSON.stringify({ status: 'ok' }), { status: 200 }))
+    ) as any;
+    const available = await cloudExecutor.checkAvailability();
+    expect(available).toBe(true);
+    expect(cloudExecutor.available).toBe(true);
+  });
 
-    const response = await oauthWorker.fetch(new Request('https://example.test/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    }));
-    expect(response.status).toBe(400);
-    await expect(json(response)).resolves.toMatchObject({ error: 'Missing GitHub OAuth code.' });
+  it('checkAvailability handles network errors', async () => {
+    global.fetch = vi.fn(() => Promise.reject(new Error('network'))) as any;
+    const available = await cloudExecutor.checkAvailability();
+    expect(available).toBe(false);
+    expect(cloudExecutor.available).toBe(false);
+  });
+
+  it('tunnels returns empty when unavailable', async () => {
+    const url = await cloudExecutor.tunnel(8080);
+    expect(url).toBe('');
+  });
+
+  it('uses sandbox when initialized', async () => {
+    const mockSandbox = {
+      exec: vi.fn(() => Promise.resolve({ stdout: '42', stderr: '', exitCode: 0, success: true, command: '' })),
+      tunnels: { get: vi.fn(() => Promise.resolve({ url: 'https://test.trycloudflare.com' })) },
+    };
+    cloudExecutor.sandboxReady = true;
+    cloudExecutor.sandboxInstance = mockSandbox as any;
+
+    const result = await cloudExecutor.run('python', 'python');
+    expect(mockSandbox.exec).toHaveBeenCalledWith('python', { timeout: 10000 });
+    expect(result.stdout).toBe('42');
+    expect(result.exitCode).toBe(0);
   });
 });

@@ -32,7 +32,7 @@ describe('projectContext', () => {
       updatedAt: Date.now(),
     });
     setProjectContext(ctx);
-    expect($projectContext.get()?.project.id).toBe('proj-1');
+    expect(($projectContext.get() as any).project.id).toBe('proj-1');
     expect($activeProjectId.get()).toBe('proj-1');
     expect($terminalCwd.get()).toBe('/projects/proj-1');
   });
@@ -51,7 +51,7 @@ describe('projectContext', () => {
       updatedAt: Date.now(),
     });
     setProjectContext(ctx);
-    updateProjectGitStatus([{ path: 'foo.ts', status: 'M' }]);
+    updateProjectGitStatus([{ path: 'foo.ts', status: 'modified', staged: false }]);
     expect($gitStatus.get()).toHaveLength(1);
     expect($gitStatus.get()[0].path).toBe('foo.ts');
   });
