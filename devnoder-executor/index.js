@@ -1,4 +1,4 @@
-import { getSandbox, proxyToSandbox } from '@cloudflare/sandbox';
+import { getSandbox, proxyToSandbox, proxyTerminal, type PtyOptions } from '@cloudflare/sandbox';
 
 const DEFAULT_SANDBOX_ID = 'devnoder-default';
 
@@ -17,6 +17,21 @@ export default {
         { status: 'ok', version: '1.0.0', configured: true },
         { headers: corsHeaders() },
       );
+    }
+
+    // WebSocket terminal proxy: /ws/terminal/:sessionId
+    if (url.pathname.startsWith('/ws/terminal/') && request.headers.get('Upgrade') === 'websocket') {
+      const sessionId = url.pathname.replace('/ws/terminal/', '') || 'default';
+      const options: PtyOptions = {
+        cols: parseInt(request.headers.get('X-Terminal-Cols') || '80', 10),
+        rows: parseInt(request.headers.get('X-Terminal-Rows') || '24', 10),
+        shell: '/bin/bash',
+      };
+      try {
+        return await proxyTerminal(sandbox as any, sessionId, request, options);
+      } catch (e) {
+        return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500, headers: { ...corsHeaders(), 'Content-Type': 'application/json' } });
+      }
     }
 
     const unimplemented = (route, detail) =>

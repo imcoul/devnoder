@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { Terminal } from '@xterm/xterm';
+import { SandboxAddon } from '@cloudflare/sandbox/xterm';
 import { terminalSession, TerminalSession, OutputLine } from '../../services/terminal/TerminalSession';
 import './TerminalPanel.css';
 
@@ -17,6 +19,9 @@ export default function TerminalPanel() {
   const [lines, setLines] = useState<Record<string, OutputLine[]>>({});
   const outputRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLInputElement>(null);
+  const xtermRef  = useRef<HTMLDivElement>(null);
+  const terminalRef = useRef<Terminal | null>(null);
+  const addonRef   = useRef<SandboxAddon | null>(null);
 
   const currentTab = tabs.find(t => t.id === activeTab)!;
 
@@ -37,6 +42,48 @@ export default function TerminalPanel() {
       outputRef.current.scrollTop = outputRef.current.scrollHeight;
     }
   }, [lines]);
+
+  // Initialize xterm.js + SandboxAddon once
+  useEffect(() => {
+    if (!xtermRef.current) return;
+
+    const term = new Terminal({
+      cursorBlink: true,
+      theme: { background: '#0D1F1E', foreground: '#E0E0E0' },
+      fontSize: 14,
+      fontFamily: 'monospace',
+    });
+    terminalRef.current = term;
+
+    const addon = new SandboxAddon({
+      getWebSocketUrl: ({ origin, sessionId }) => {
+        const wsOrigin = origin.replace(/^http/, 'ws');
+        return `${wsOrigin}/ws/terminal/${sessionId ?? 'default'}`;
+      },
+      reconnect: true,
+      onStateChange: (state, error) => {
+        if (state === 'connected') {
+          currentTab.session.enableSandbox({ fetch: (req: Request) => Promise.resolve(new Response('connected', { status: 200 })) }, sessionId);
+        }
+        if (state === 'disconnected' && error) {
+          currentTab.session.emit({ type: 'system', text: `Terminal disconnected: ${error.message}` });
+        }
+      },
+    });
+    addonRef.current = addon;
+    term.loadAddon(addon);
+
+    term.open(xtermRef.current);
+
+    // Connect to default session
+    const sessionId = crypto.randomUUID();
+    addon.connect({ sandboxId: 'devnoder-default', sessionId });
+
+    return () => {
+      addon.dispose();
+      term.dispose();
+    };
+  }, []);
 
   const addTab = () => {
     const tab = makeTab(tabs.length + 1);
@@ -95,16 +142,21 @@ export default function TerminalPanel() {
         <button className="terminal-tab-add" onClick={addTab} aria-label="New terminal tab">+</button>
       </div>
 
-      {/* Output */}
-      <div className="terminal-output" ref={outputRef}>
-        {currentLines.map((line, i) => (
-          <div key={i} className={`terminal-line terminal-line--${line.type}`}>
-            {line.type === 'input'
-              ? <><span className="terminal-prompt">$</span> {line.text.replace(/^\$\s*/, '')}</>
-              : line.text}
-          </div>
-        ))}
-      </div>
+      {/* xterm.js terminal */}
+      <div className="terminal-xterm" ref={xtermRef} />
+
+      {/* Fallback output for non-PTY mode */}
+      {!terminalRef.current && (
+        <div className="terminal-output" ref={outputRef}>
+          {currentLines.map((line, i) => (
+            <div key={i} className={`terminal-line terminal-line--${line.type}`}>
+              {line.type === 'input'
+                ? <><span className="terminal-prompt">$</span> {line.text.replace(/^\$\s*/, '')}</>
+                : line.text}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Input */}
       <div className="terminal-input-row">
