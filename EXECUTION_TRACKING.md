@@ -85,6 +85,12 @@ Track every change with:
 - Test infrastructure (2026-09-22, @team)
   - Files: vitest.config.ts, .github/workflows/test.yml, 5 test files
   - Revert: git revert d636fbf
+- Cloudflare Sandbox SDK (2026-09-22, @team)
+  - Files: src/services/terminal/CloudExecutor.ts, devnoder-executor/index.js, devnoder-executor/wrangler.toml
+  - Revert: git revert 12a6b14
+- xterm.js + SandboxAddon terminal (2026-09-22, @team)
+  - Files: src/components/terminal/TerminalPanel.tsx, src/services/terminal/TerminalSession.ts
+  - Revert: git revert da3445e
 
 ### Changed
 - OAuth Worker URL now configurable (2026-09-22, @team)
@@ -275,7 +281,7 @@ Labels:
 #### Weekly Status Email
 
 ```markdown
-Subject: DevNoder Weekly Status — Sprint 0 Week 2
+Subject: DevNoder Weekly Status — Sprint 1 Week 1
 
 ## Completed
 - [x] Service registry (commit 60cf1d1)
@@ -283,17 +289,20 @@ Subject: DevNoder Weekly Status — Sprint 0 Week 2
 - [x] ProjectContext store (commit c4c6089)
 - [x] VirtualFS abstraction (commit f882168)
 - [x] Test infrastructure: vitest config, CI workflow, 5 tests (commit d636fbf)
+- [x] Cloudflare Sandbox SDK adoption (commit 12a6b14)
+- [x] xterm.js + SandboxAddon terminal integration (commit da3445e)
 
 ## In Progress
-- None — Sprint 0 tasks complete
+- None — Sprint 1.1 complete
 
 ## Next Week
-- Sprint 1: Cloudflare Sandbox SDK evaluation
-- Sprint 1: y-codemirror.next + Hocuspocus OSS adoption
-- Sprint 1: Real PTY terminal
+- Sprint 1.2: LSP integration
+- Sprint 1.3: Terminal multiplexer
+- Sprint 1.4: y-codemirror.next + Hocuspocus OSS adoption
 
 ## Risks
-- php-wasm build fix still shows build warnings (not blocking)
+- @cloudflare/containers has missing local file; tests mock around it
+- Real DO deployment requires Cloudflare account testing
 ```
 
 ### 8. Emergency Procedures
