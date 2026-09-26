@@ -50,6 +50,7 @@ describe('LSPClient', () => {
     const calls = MockWebSocket.instances[0].send.mock.calls;
     const initCall = calls.find((c: any[]) => JSON.parse(c[0]).method === 'initialize');
     expect(initCall).toBeDefined();
+    if (!initCall) return;
     const params = JSON.parse(initCall[0]).params;
     expect(params.rootUri).toBe('file:///test');
     expect(params.capabilities).toBeDefined();
@@ -108,6 +109,7 @@ describe('LSPClient', () => {
     const calls = MockWebSocket.instances[0].send.mock.calls;
     const didOpen = calls.find((c: any[]) => JSON.parse(c[0]).method === 'textDocument/didOpen');
     expect(didOpen).toBeDefined();
+    if (!didOpen) return;
     const params = JSON.parse(didOpen[0]).params;
     expect(params.textDocument.uri).toBe('file:///test/index.ts');
     expect(params.textDocument.text).toBe('console.log(1)');

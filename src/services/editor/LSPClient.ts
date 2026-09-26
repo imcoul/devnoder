@@ -157,11 +157,12 @@ export class LSPClient {
 
   private handleMessage(msg: { id?: number; method?: string; params?: unknown; result?: unknown }) {
     if (msg.id && this.pending.has(msg.id)) {
-      const { resolve } = this.pending.get(msg.id)!;
+      const entry = this.pending.get(msg.id)!;
       this.pending.delete(msg.id);
-      resolve(msg.result);
+      entry.resolve((msg.result as unknown) ?? null);
     } else if (msg.method) {
-      this.handlers.forEach(h => h(msg.method, msg.params));
+      const method = msg.method;
+      this.handlers.forEach(h => h(method, msg.params));
     }
   }
 }
