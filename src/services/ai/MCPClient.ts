@@ -4,9 +4,6 @@
 //   - Replaces custom transport implementations with SDK's Client + transports.
 //   - Maintains backward-compatible API for existing consumers.
 
-import { Client, type ClientOptions } from '@modelcontextprotocol/sdk/client/index.js';
-import { WebSocketClientTransport } from '@modelcontextprotocol/sdk/client/websocket.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { MCPServerConfig, MCPTool, mcpConfigStore } from './MCPConfigStore';
 
 export interface ToolCallRequest {
@@ -22,8 +19,7 @@ export interface ToolCallResult {
 
 interface MCPConnection {
   config: MCPServerConfig;
-  client: Client;
-  transport: WebSocketClientTransport | StdioClientTransport;
+  client: any;
   tools: MCPTool[];
   connected: boolean;
 }
@@ -35,23 +31,26 @@ class MCPClient {
   onChange(cb: () => void) { this.listeners.push(cb); }
   private notify() { this.listeners.forEach(cb => cb()); }
 
-  private makeTransport(config: MCPServerConfig): WebSocketClientTransport | StdioClientTransport {
-    switch (config.transport) {
-      case 'websocket': {
-        const url = new URL(config.url!);
-        return new WebSocketClientTransport(url);
-      }
-      case 'stdio': {
-        const params = {
-          command: config.command!,
-          args: [],
-          env: process.env as Record<string, string>,
-        };
-        return new StdioClientTransport(params);
-      }
-      default:
-        throw new Error(`Unsupported transport: ${(config as any).transport}`);
+  private async loadSDK(): Promise<{
+    Client: new (info: { name: string; version: string }, options?: any) => any;
+    WebSocketClientTransport: new (url: URL) => any;
+  }> {
+    const sdk = await import('@modelcontextprotocol/sdk/client/index.js');
+    const wsTransport = await import('@modelcontextprotocol/sdk/client/websocket.js');
+    return {
+      Client: sdk.Client as any,
+      WebSocketClientTransport: wsTransport.WebSocketClientTransport as any,
+    };
+  }
+
+  private async makeTransport(config: MCPServerConfig, sdk: Awaited<ReturnType<typeof this.loadSDK>>): Promise<any> {
+    if (config.transport === 'websocket') {
+      return new sdk.WebSocketClientTransport(new URL(config.url!));
     }
+    if (config.transport === 'stdio') {
+      throw new Error('Stdio transport requires Node.js environment. Use the WebSocket transport in the browser.');
+    }
+    throw new Error(`Unsupported transport: ${(config as any).transport}`);
   }
 
   async connect(config: MCPServerConfig): Promise<MCPConnection> {
@@ -62,13 +61,14 @@ class MCPClient {
       throw new Error(`${config.name}: no capabilities granted — nothing to connect for`);
     }
 
-    const transport = this.makeTransport(config);
-    const client = new Client(
+    const sdk = await this.loadSDK();
+    const transport = await this.makeTransport(config, sdk);
+    const client = new sdk.Client(
       { name: 'DevNoder', version: '0.1.0' },
-      { capabilities: { tools: {}, resources: {}, prompts: {} } } as ClientOptions,
+      { capabilities: { sampling: { tools: {} } } },
     );
 
-    const conn: MCPConnection = { config, client, transport, tools: [], connected: false };
+    const conn: MCPConnection = { config, client, tools: [], connected: false };
     this.connections.set(config.id, conn);
 
     try {
@@ -76,10 +76,10 @@ class MCPClient {
       conn.connected = true;
 
       const toolsResult = await client.listTools({}, { timeout: 10000 });
-      conn.tools = (toolsResult.tools ?? []).map(t => ({
+      conn.tools = (toolsResult.tools ?? []).map((t: any) => ({
         name: t.name,
         description: t.description ?? '',
-        inputSchema: (t as any).inputSchema ?? {},
+        inputSchema: t.inputSchema ?? {},
         serverId: config.id,
       }));
 
@@ -102,7 +102,6 @@ class MCPClient {
     if (!conn) return;
     try {
       await conn.client.close();
-      await conn.transport.close();
     } catch {
       // Ignore close errors
     }
