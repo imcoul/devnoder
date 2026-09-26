@@ -41,6 +41,7 @@ export default defineConfig({
       '@php-wasm/web-7-4',
       '@php-wasm/universal',
       '@cloudflare/sandbox',
+      '@modelcontextprotocol/sdk',
     ],
   },
   ssr: {
@@ -55,6 +56,7 @@ export default defineConfig({
       '@php-wasm/web-7-4',
       '@php-wasm/universal',
       '@cloudflare/sandbox',
+      '@modelcontextprotocol/sdk',
     ],
   },
   build: {
@@ -71,6 +73,7 @@ export default defineConfig({
         '@php-wasm/universal',
         '@cloudflare/sandbox',
         'cloudflare:workers',
+        '@modelcontextprotocol/sdk',
       ],
     },
   },
