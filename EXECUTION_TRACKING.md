@@ -91,6 +91,15 @@ Track every change with:
 - xterm.js + SandboxAddon terminal (2026-09-22, @team)
   - Files: src/components/terminal/TerminalPanel.tsx, src/services/terminal/TerminalSession.ts
   - Revert: git revert da3445e
+- LSP client foundation (2026-09-22, @team)
+  - Files: src/services/editor/LSPClient.ts, src/services/editor/LSPClient.test.ts
+  - Revert: git revert cc003b5
+- CollabService unit tests (2026-09-22, @team)
+  - Files: src/services/collab/CollabService.test.ts
+  - Revert: git revert 9a08e26
+- Terminal multiplexer with split panes (2026-09-22, @team)
+  - Files: src/components/terminal/TerminalPanel.tsx
+  - Revert: git revert c448138
 
 ### Changed
 - OAuth Worker URL now configurable (2026-09-22, @team)
@@ -281,7 +290,7 @@ Labels:
 #### Weekly Status Email
 
 ```markdown
-Subject: DevNoder Weekly Status — Sprint 1 Week 1
+Subject: DevNoder Weekly Status — Sprint 1 Week 2
 
 ## Completed
 - [x] Service registry (commit 60cf1d1)
@@ -291,18 +300,22 @@ Subject: DevNoder Weekly Status — Sprint 1 Week 1
 - [x] Test infrastructure: vitest config, CI workflow, 5 tests (commit d636fbf)
 - [x] Cloudflare Sandbox SDK adoption (commit 12a6b14)
 - [x] xterm.js + SandboxAddon terminal integration (commit da3445e)
+- [x] LSP client foundation (commit cc003b5)
+- [x] CollabService unit tests (commit 9a08e26)
+- [x] Terminal multiplexer with split panes (commit c448138)
 
 ## In Progress
-- None — Sprint 1.1 complete
+- None — Sprint 1 tasks complete
 
 ## Next Week
-- Sprint 1.2: LSP integration
-- Sprint 1.3: Terminal multiplexer
-- Sprint 1.4: y-codemirror.next + Hocuspocus OSS adoption
+- Sprint 2: MCP complete
+- Sprint 2: AI 2.0 with LiteLLM
+- Sprint 2: RAG with Cloudflare Vectorize
 
 ## Risks
 - @cloudflare/containers has missing local file; tests mock around it
 - Real DO deployment requires Cloudflare account testing
+- Hocuspocus server installed but not yet wired to CollabService
 ```
 
 ### 8. Emergency Procedures
