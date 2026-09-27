@@ -2,7 +2,7 @@
 import { mcpClient } from './MCPClient';
 import { cryptoVault } from '../security/CryptoVault';
 
-export type Provider = 'webllm' | 'groq' | 'openai' | 'anthropic' | 'openrouter';
+export type Provider = 'webllm' | 'groq' | 'openai' | 'anthropic' | 'openrouter' | 'litellm';
 
 export interface ModelConfig {
   id: string; label: string; provider: Provider;
@@ -24,6 +24,7 @@ export const MODELS: ModelConfig[] = [
   { id: 'claude-sonnet-4-6',                        label: 'Claude Sonnet 4.6',      provider: 'anthropic', contextWindow: 200000, free: false, offlineCapable: false, supportsTools: true  },
   { id: 'deepseek/deepseek-coder',                  label: 'DeepSeek Coder (OR)',    provider: 'openrouter',contextWindow: 128000, free: true,  offlineCapable: false, supportsTools: false },
   { id: 'meta-llama/llama-3.1-8b-instruct:free',   label: 'Llama 3.1 8B (OR free)', provider: 'openrouter',contextWindow: 131072, free: true,  offlineCapable: false, supportsTools: false },
+  { id: 'litellm-proxy',                             label: 'LiteLLM Proxy',           provider: 'litellm',    contextWindow: 131072, free: true,  offlineCapable: false, supportsTools: true  },
 ];
 
 export interface Message { role: 'user' | 'assistant' | 'system' | 'tool'; content: string; tool_call_id?: string; tool_name?: string; }
@@ -68,8 +69,41 @@ class AIGateway {
       case 'openai':     return this._streamOpenAI('https://api.openai.com/v1/chat/completions',    this.keys.openai ?? '',    messages, onChunk, signal, tools);
       case 'groq':       return this._streamOpenAI('https://api.groq.com/openai/v1/chat/completions', this.keys.groq ?? '',   messages, onChunk, signal, tools);
       case 'openrouter': return this._streamOpenAI('https://openrouter.ai/api/v1/chat/completions', this.keys.openrouter ?? '', messages, onChunk, signal, []);
+      case 'litellm':    return this._streamLiteLLM(messages, onChunk, signal, tools);
       default:           onChunk({ delta: 'No API key configured.', done: true });
     }
+  }
+
+  private fallbackModelIds: string[] = [];
+
+  setFallbackModelIds(ids: string[]) {
+    this.fallbackModelIds = ids.filter(id => MODELS.some(m => m.id === id));
+  }
+
+  async streamWithFallback(messages: Message[], onChunk: StreamHandler, signal?: AbortSignal): Promise<void> {
+    const candidates = [this.modelId, ...this.fallbackModelIds.filter(id => id !== this.modelId)];
+    const tried = new Set<string>();
+
+    for (const candidate of candidates) {
+      if (tried.has(candidate)) continue;
+      tried.add(candidate);
+
+      const previous = this.modelId;
+      this.setModel(candidate);
+      let finalChunk: StreamChunk | undefined;
+      const wrapped: StreamHandler = chunk => { finalChunk = chunk; onChunk(chunk); };
+
+      try {
+        await this.stream(messages, wrapped, signal);
+      } finally {
+        if (tried.size > 1) this.setModel(previous);
+      }
+
+      const hadError = finalChunk?.done && typeof finalChunk.delta === 'string' && finalChunk.delta.startsWith('Error:');
+      if (!hadError) return;
+    }
+
+    onChunk({ delta: 'All models failed.', done: true });
   }
 
   async complete(prompt: string, opts: { maxTokens?: number; temperature?: number } = {}): Promise<string> {
@@ -184,6 +218,83 @@ class AIGateway {
             const data = line.slice(6);
             if (data === '[DONE]') {
               // Process any pending tool calls
+              if (Object.keys(pendingToolCalls).length) {
+                for (const tc of Object.values(pendingToolCalls)) {
+                  const tool = tools.find(t => t.name === tc.name);
+                  if (!tool) continue;
+                  const args = JSON.parse(tc.argsRaw || '{}');
+                  const evt: ToolCallEvent = { id: tc.id, name: tc.name, args, serverId: tool.serverId };
+                  onChunk({ delta: '', done: false, toolCall: evt });
+                  try {
+                    const result = await mcpClient.callTool({ serverId: tool.serverId, toolName: tc.name, args });
+                    const resultText = mcpClient.resultToText(result);
+                    evt.result = resultText;
+                    onChunk({ delta: '', done: false, toolCall: evt });
+                    history = [...history,
+                      { role: 'assistant', content: JSON.stringify({ tool_calls: [{ id: tc.id, type: 'function', function: { name: tc.name, arguments: tc.argsRaw } }] }) },
+                      { role: 'tool', content: resultText, tool_call_id: tc.id, tool_name: tc.name },
+                    ];
+                    continueLoop = true;
+                  } catch (e: any) { onChunk({ delta: `\n[Tool error: ${e.message}]`, done: false }); }
+                }
+                pendingToolCalls = {};
+              } else {
+                onChunk({ delta: '', done: true });
+              }
+              return;
+            }
+            try {
+              const j = JSON.parse(data);
+              const delta = j.choices?.[0]?.delta;
+              if (delta?.content) onChunk({ delta: delta.content, done: false });
+              if (delta?.tool_calls) {
+                for (const tc of delta.tool_calls) {
+                  const idx = tc.index ?? 0;
+                  if (!pendingToolCalls[idx]) pendingToolCalls[idx] = { id: tc.id ?? '', name: '', argsRaw: '' };
+                  if (tc.id) pendingToolCalls[idx].id = tc.id;
+                  if (tc.function?.name) pendingToolCalls[idx].name = tc.function.name;
+                  if (tc.function?.arguments) pendingToolCalls[idx].argsRaw += tc.function.arguments;
+                }
+              }
+            } catch { /* skip */ }
+          }
+        }
+      } catch (e: any) { if (e.name !== 'AbortError') onChunk({ delta: `Error: ${e.message}`, done: true }); }
+    }
+  }
+
+  // ── LiteLLM Proxy — OpenAI-compatible streaming ────────────────────────────
+  private async _streamLiteLLM(messages: Message[], onChunk: StreamHandler, signal?: AbortSignal, tools: any[] = []) {
+    const baseUrl = this.keys.litellm ?? 'http://localhost:4000';
+    const url = `${baseUrl}/v1/chat/completions`;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (this.keys.litellm) headers['Authorization'] = `Bearer ${this.keys.litellm}`;
+    const openAITools = mcpClient.toOpenAITools(tools);
+    let history = messages.filter(m => m.role !== 'tool');
+    let continueLoop = true;
+
+    while (continueLoop) {
+      continueLoop = false;
+      try {
+        const res = await fetch(url, {
+          method: 'POST', signal, headers,
+          body: JSON.stringify({
+            model: this.modelId, messages: history, stream: true, max_tokens: 4096,
+            ...(openAITools.length && { tools: openAITools, tool_choice: 'auto' }),
+          }),
+        });
+        if (!res.ok) { onChunk({ delta: `LiteLLM error ${res.status}`, done: true }); return; }
+
+        const reader = res.body!.getReader();
+        const dec = new TextDecoder();
+        let pendingToolCalls: Record<string, { id: string; name: string; argsRaw: string }> = {};
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          for (const line of dec.decode(value).split('\n').filter(l => l.startsWith('data: '))) {
+            const data = line.slice(6);
+            if (data === '[DONE]') {
               if (Object.keys(pendingToolCalls).length) {
                 for (const tc of Object.values(pendingToolCalls)) {
                   const tool = tools.find(t => t.name === tc.name);

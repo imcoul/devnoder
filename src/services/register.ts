@@ -25,6 +25,12 @@ registerService('detectSecrets', () => detectSecrets);
 import { mcpConfigStore } from './ai/MCPConfigStore';
 registerService(ServiceKey.mcpConfigStore, () => mcpConfigStore);
 
+import { marketplaceStore } from './ai/MCPMarketplaceStore';
+registerService(ServiceKey.mcpMarketplaceStore, () => marketplaceStore);
+
+import { oauthHelper } from './ai/MCPOAuthHelper';
+registerService(ServiceKey.mcpOAuthHelper, () => oauthHelper);
+
 import { aiGateway } from './ai/AIGateway';
 registerService(ServiceKey.aiGateway, () => aiGateway);
 
@@ -40,6 +46,9 @@ registerService(ServiceKey.skillsEngine, () => skillsEngine);
 import { parseMessage } from './ai/StreamingMessageParser';
 registerService('streamingMessageParser', () => ({ parseMessage }));
 
+import { agentLoop } from './ai/AgentLoop';
+registerService(ServiceKey.agentLoop, () => agentLoop);
+
 import { webLLMManager } from './ai/WebLLMManager';
 registerService(ServiceKey.webLLMManager, () => webLLMManager);
 
@@ -48,6 +57,9 @@ registerService(ServiceKey.diffTracker, () => diffTracker);
 
 import { feedbackStore } from './ai/FeedbackStore';
 registerService(ServiceKey.feedbackStore, () => feedbackStore);
+
+import { conversationStore } from './ai/ConversationStore';
+registerService(ServiceKey.conversationStore, () => conversationStore);
 
 import { mcpClient } from './ai/MCPClient';
 registerService('mcpClient', () => mcpClient);

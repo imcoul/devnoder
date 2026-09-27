@@ -13,3 +13,4 @@ dist
 
 # Local tooling and OS files.
 .DS_Store
+tsconfig.tsbuildinfo

@@ -115,3 +115,9 @@
 .mcp-empty span { font-size:2rem; }
 .mcp-empty p { font-size:0.85rem; }
 .mcp-empty-sub { font-size:0.75rem !important; }
+
+/* Marketplace */
+.mcp-marketplace { display:flex; flex-direction:column; gap:0.4rem; }
+.mcp-marketplace-head { display:flex; justify-content:space-between; align-items:center; font-weight:600; font-size:0.8rem; }
+.mcp-marketplace-search { flex:1; max-inline-size:14rem; padding:0.25rem 0.5rem; border:1px solid var(--color-border); border-radius:0.25rem; background:var(--color-surface); color:var(--color-text); font-size:0.8rem; }
+.mcp-preset-desc { font-size:0.7rem; color:var(--color-text-muted); line-height:1.35; }

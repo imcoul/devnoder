@@ -66,6 +66,15 @@ export interface MCPAuditEntry {
   detail?: string;
 }
 
+export interface MCPOAuthToken {
+  id?: number;
+  serverId: string;
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt: number;
+  scope: string;
+}
+
 export interface MCPTool {
   name: string;
   description: string;
@@ -76,10 +85,12 @@ export interface MCPTool {
 class MCPConfigDB extends Dexie {
   servers!: Table<MCPServerConfig>;
   auditLog!: Table<MCPAuditEntry>;
+  oauthTokens!: Table<MCPOAuthToken>;
   constructor() {
     super('devnoder-mcp');
     this.version(1).stores({ servers: 'id, transport, enabled, addedAt' });
     this.version(2).stores({ servers: 'id, transport, enabled, addedAt', auditLog: 'id, serverId, ts' });
+    this.version(3).stores({ servers: 'id, transport, enabled, addedAt', auditLog: 'id, serverId, ts', oauthTokens: 'serverId, expiresAt' });
   }
 }
 
@@ -179,5 +190,25 @@ export const mcpConfigStore = {
       return rows.sort((a, b) => b.ts - a.ts).slice(0, limit);
     }
     return db.auditLog.orderBy('ts').reverse().limit(limit).toArray();
+  },
+
+  // ── OAuth tokens — encrypted at rest ───────────────────────────────────────
+  async setOAuthToken(serverId: string, token: Omit<MCPOAuthToken, 'id' | 'serverId'>): Promise<void> {
+    const encrypted = { ...token, accessToken: await cryptoVault.encrypt(token.accessToken) };
+    if (token.refreshToken) (encrypted as any).refreshToken = await cryptoVault.encrypt(token.refreshToken);
+    await db.oauthTokens.put({ ...encrypted, serverId });
+  },
+
+  async getOAuthToken(serverId: string): Promise<MCPOAuthToken | undefined> {
+    const row = await db.oauthTokens.where('serverId').equals(serverId).first();
+    if (!row) return undefined;
+    const accessToken = await cryptoVault.decrypt(row.accessToken);
+    const refreshToken = row.refreshToken ? await cryptoVault.decrypt(row.refreshToken) : undefined;
+    if (!accessToken) return undefined;
+    return { ...row, accessToken, refreshToken: refreshToken ?? undefined };
+  },
+
+  async deleteOAuthToken(serverId: string): Promise<void> {
+    await db.oauthTokens.where('serverId').equals(serverId).delete();
   },
 };

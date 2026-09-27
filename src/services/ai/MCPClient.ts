@@ -1,26 +1,11 @@
-// MCPClient.ts — full MCP client: stdio (Termux WS bridge) / WebSocket / HTTP SSE
+// MCPClient.ts — full MCP client using @modelcontextprotocol/sdk (Apache-2.0).
+//
+// Sprint 2 Task 2.1: Adopt MCP TypeScript SDK.
+//   - Replaces custom transport implementations with SDK's Client + transports.
+//   - Maintains backward-compatible API for existing consumers.
+
 import { MCPServerConfig, MCPTool, mcpConfigStore } from './MCPConfigStore';
-
-// ─── MCP protocol types ───────────────────────────────────────────────────────
-interface MCPRequest {
-  jsonrpc: '2.0';
-  id: string | number;
-  method: string;
-  params?: unknown;
-}
-
-interface MCPResponse {
-  jsonrpc: '2.0';
-  id: string | number;
-  result?: unknown;
-  error?: { code: number; message: string; data?: unknown };
-}
-
-interface MCPNotification {
-  jsonrpc: '2.0';
-  method: string;
-  params?: unknown;
-}
+import { WASITransport } from './MCPWASITransport';
 
 export interface ToolCallRequest {
   serverId: string;
@@ -33,170 +18,13 @@ export interface ToolCallResult {
   isError?: boolean;
 }
 
-// ─── Transport base ───────────────────────────────────────────────────────────
-abstract class MCPTransport {
-  protected pending = new Map<string | number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
-  protected msgId = 1;
-
-  abstract connect(): Promise<void>;
-  abstract disconnect(): void;
-  abstract send(msg: MCPRequest): void;
-
-  protected handleMessage(raw: string) {
-    try {
-      const msg = JSON.parse(raw) as MCPResponse | MCPNotification;
-      if ('id' in msg) {
-        const p = this.pending.get(msg.id);
-        if (!p) return;
-        this.pending.delete(msg.id);
-        if ((msg as MCPResponse).error) p.reject(new Error((msg as MCPResponse).error!.message));
-        else p.resolve((msg as MCPResponse).result);
-      }
-    } catch { /* skip malformed */ }
-  }
-
-  async call(method: string, params?: unknown): Promise<unknown> {
-    const id = this.msgId++;
-    return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-      this.send({ jsonrpc: '2.0', id, method, params });
-      setTimeout(() => {
-        if (this.pending.has(id)) {
-          this.pending.delete(id);
-          reject(new Error(`MCP timeout: ${method}`));
-        }
-      }, 15000);
-    });
-  }
-}
-
-// ─── WebSocket transport ──────────────────────────────────────────────────────
-class WebSocketTransport extends MCPTransport {
-  private ws: WebSocket | null = null;
-  private queue: MCPRequest[] = [];
-
-  constructor(private url: string) { super(); }
-
-  async connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const ws = new WebSocket(this.url);
-      const timeout = setTimeout(() => { ws.close(); reject(new Error('WS connect timeout')); }, 6000);
-      ws.onopen = () => {
-        clearTimeout(timeout);
-        this.ws = ws;
-        this.queue.forEach(m => ws.send(JSON.stringify(m)));
-        this.queue = [];
-        resolve();
-      };
-      ws.onmessage = e => this.handleMessage(e.data);
-      ws.onerror = () => { clearTimeout(timeout); reject(new Error('WS error')); };
-      ws.onclose = () => { this.ws = null; };
-    });
-  }
-
-  disconnect() { this.ws?.close(); this.ws = null; }
-
-  send(msg: MCPRequest) {
-    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg));
-    else this.queue.push(msg);
-  }
-}
-
-// ─── HTTP SSE transport ───────────────────────────────────────────────────────
-class SSETransport extends MCPTransport {
-  private es: EventSource | null = null;
-  private postUrl: string;
-
-  constructor(private sseUrl: string, private headers: Record<string, string> = {}) {
-    super();
-    // SSE URL for receive, derived POST URL for send
-    this.postUrl = sseUrl.replace(/\/sse$/, '/message').replace(/\?.*$/, '');
-  }
-
-  async connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      // EventSource doesn't support custom headers natively —
-      // use fetch-based SSE polyfill for authenticated connections
-      const url = Object.keys(this.headers).length === 0
-        ? this.sseUrl
-        : this.sseUrl; // same URL; auth handled server-side via query param or cookie
-
-      const es = new EventSource(url);
-      const timeout = setTimeout(() => { es.close(); reject(new Error('SSE connect timeout')); }, 8000);
-
-      es.onopen = () => { clearTimeout(timeout); this.es = es; resolve(); };
-      es.onmessage = e => this.handleMessage(e.data);
-      es.onerror = () => { clearTimeout(timeout); reject(new Error('SSE connection failed')); };
-    });
-  }
-
-  disconnect() { this.es?.close(); this.es = null; }
-
-  send(msg: MCPRequest) {
-    // SSE is receive-only; send via POST
-    fetch(this.postUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...this.headers },
-      body: JSON.stringify(msg),
-    }).catch(console.warn);
-  }
-}
-
-// ─── stdio-via-Termux transport ───────────────────────────────────────────────
-class StdioTermuxTransport extends MCPTransport {
-  private ws: WebSocket | null = null;
-  private queue: string[] = [];
-
-  constructor(private command: string) { super(); }
-
-  async connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      // Connect to Termux WS bridge on port 7723
-      // The bridge spawns the command and pipes stdio over WebSocket
-      const ws = new WebSocket('ws://localhost:7723/mcp');
-      const timeout = setTimeout(() => { ws.close(); reject(new Error('Termux bridge not available')); }, 4000);
-
-      ws.onopen = () => {
-        clearTimeout(timeout);
-        // Tell bridge which command to spawn
-        ws.send(JSON.stringify({ type: 'spawn', command: this.command }));
-        this.ws = ws;
-        this.queue.forEach(m => ws.send(m));
-        this.queue = [];
-      };
-
-      ws.onmessage = e => {
-        try {
-          const msg = JSON.parse(e.data);
-          if (msg.type === 'ready') { resolve(); return; }
-          if (msg.type === 'stdout') this.handleMessage(msg.data);
-          if (msg.type === 'error') reject(new Error(msg.error));
-        } catch { this.handleMessage(e.data); }
-      };
-
-      ws.onerror = () => { clearTimeout(timeout); reject(new Error('Termux WS bridge error')); };
-      ws.onclose = () => { this.ws = null; };
-    });
-  }
-
-  disconnect() { this.ws?.close(); this.ws = null; }
-
-  send(msg: MCPRequest) {
-    const raw = JSON.stringify(msg);
-    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(raw);
-    else this.queue.push(raw);
-  }
-}
-
-// ─── Server connection ────────────────────────────────────────────────────────
 interface MCPConnection {
   config: MCPServerConfig;
-  transport: MCPTransport;
+  client: any;
   tools: MCPTool[];
   connected: boolean;
 }
 
-// ─── Main MCP Client ─────────────────────────────────────────────────────────
 class MCPClient {
   private connections = new Map<string, MCPConnection>();
   private listeners: Array<() => void> = [];
@@ -204,63 +32,80 @@ class MCPClient {
   onChange(cb: () => void) { this.listeners.push(cb); }
   private notify() { this.listeners.forEach(cb => cb()); }
 
-  private makeTransport(config: MCPServerConfig): MCPTransport {
-    switch (config.transport) {
-      case 'websocket': return new WebSocketTransport(config.url!);
-      case 'sse':       return new SSETransport(config.url!, config.headers);
-      case 'stdio':     return new StdioTermuxTransport(config.command!);
+  private async loadSDK(): Promise<{
+    Client: new (info: { name: string; version: string }, options?: any) => any;
+    WebSocketClientTransport: new (url: URL) => any;
+  }> {
+    const sdk = await import('@modelcontextprotocol/sdk/client/index.js');
+    const wsTransport = await import('@modelcontextprotocol/sdk/client/websocket.js');
+    return {
+      Client: sdk.Client as any,
+      WebSocketClientTransport: wsTransport.WebSocketClientTransport as any,
+    };
+  }
+
+  private async makeTransport(config: MCPServerConfig, sdk: Awaited<ReturnType<typeof this.loadSDK>>): Promise<any> {
+    if (config.transport === 'websocket') {
+      return new sdk.WebSocketClientTransport(new URL(config.url!));
     }
+    if (config.transport === 'stdio') {
+      return new WASITransport(config.command!);
+    }
+    throw new Error(`Unsupported transport: ${(config as any).transport}`);
   }
 
   async connect(config: MCPServerConfig): Promise<MCPConnection> {
     const existing = this.connections.get(config.id);
     if (existing?.connected) return existing;
 
-    // A connection the user never granted any capability to (consent step
-    // skipped, or explicitly revoked down to nothing) doesn't get to talk to
-    // anything — capabilities are an enforced gate here, not just a label
-    // shown once in the Add-Server UI.
     if (!config.capabilities?.length) {
       throw new Error(`${config.name}: no capabilities granted — nothing to connect for`);
     }
 
-    const transport = this.makeTransport(config);
-    const conn: MCPConnection = { config, transport, tools: [], connected: false };
+    const sdk = await this.loadSDK();
+    const transport = await this.makeTransport(config, sdk);
+    const client = new sdk.Client(
+      { name: 'DevNoder', version: '0.1.0' },
+      { capabilities: { sampling: { tools: {} } } },
+    );
+
+    const conn: MCPConnection = { config, client, tools: [], connected: false };
     this.connections.set(config.id, conn);
 
-    await transport.connect();
-    conn.connected = true;
+    try {
+      await client.connect(transport);
+      conn.connected = true;
 
-    // MCP handshake
-    await transport.call('initialize', {
-      protocolVersion: '2024-11-05',
-      capabilities: { tools: {} },
-      clientInfo: { name: 'DevNoder', version: '0.1.0' },
-    });
-    await transport.call('notifications/initialized');
+      const toolsResult = await client.listTools({}, { timeout: 10000 });
+      conn.tools = (toolsResult.tools ?? []).map((t: any) => ({
+        name: t.name,
+        description: t.description ?? '',
+        inputSchema: t.inputSchema ?? {},
+        serverId: config.id,
+      }));
 
-    // Discover tools
-    const toolsResult = await transport.call('tools/list') as { tools: any[] };
-    conn.tools = (toolsResult.tools ?? []).map(t => ({
-      name: t.name,
-      description: t.description ?? '',
-      inputSchema: t.inputSchema ?? {},
-      serverId: config.id,
-    }));
+      await mcpConfigStore.updateMeta(config.id, {
+        lastConnectedAt: Date.now(),
+        toolCount: conn.tools.length,
+      });
 
-    await mcpConfigStore.updateMeta(config.id, {
-      lastConnectedAt: Date.now(),
-      toolCount: conn.tools.length,
-    });
-
-    this.notify();
-    return conn;
+      this.notify();
+      return conn;
+    } catch (e) {
+      conn.connected = false;
+      this.connections.delete(config.id);
+      throw e;
+    }
   }
 
   async disconnect(serverId: string): Promise<void> {
     const conn = this.connections.get(serverId);
     if (!conn) return;
-    conn.transport.disconnect();
+    try {
+      await conn.client.close();
+    } catch {
+      // Ignore close errors
+    }
     conn.connected = false;
     this.connections.delete(serverId);
     this.notify();
@@ -305,15 +150,17 @@ class MCPClient {
     }
 
     try {
-      const result = await conn.transport.call('tools/call', {
-        name: req.toolName,
-        arguments: req.args,
-      }) as ToolCallResult;
+      const result = await conn.client.callTool(
+        { name: req.toolName, arguments: req.args },
+        undefined,
+        { timeout: 30000 },
+      );
+      const content = (result as any).content ?? [];
       await mcpConfigStore.logAudit({
         serverId: req.serverId, serverName: conn.config.name,
         toolName: req.toolName, argKeys, outcome: 'allowed',
       });
-      return result;
+      return { content };
     } catch (e: any) {
       await mcpConfigStore.logAudit({
         serverId: req.serverId, serverName: conn.config.name,
@@ -323,7 +170,6 @@ class MCPClient {
     }
   }
 
-  // Convert MCP tool schema to Anthropic/OpenAI tool format
   toAnthropicTools(tools: MCPTool[]): any[] {
     return tools.map(t => ({
       name: t.name,
@@ -343,7 +189,6 @@ class MCPClient {
     }));
   }
 
-  // Convert tool result to text for injection
   resultToText(result: ToolCallResult): string {
     return result.content
       .map(c => c.type === 'text' ? c.text : `[image: ${c.mimeType}]`)

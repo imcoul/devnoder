@@ -4,6 +4,7 @@ import {
   mcpConfigStore, MCPServerConfig, MCPTool, MCP_PRESETS, MCPTransport,
   MCPCapability, CAPABILITY_LABELS, MCPAuditEntry,
 } from '../../services/ai/MCPConfigStore';
+import { marketplaceStore, type MarketplaceEntry } from '../../services/ai/MCPMarketplaceStore';
 import { connectionSigning } from '../../services/security/ConnectionSigning';
 import { showToast } from '../../stores/ui';
 import './MCPServerPanel.css';
@@ -191,6 +192,11 @@ export default function MCPServerPanel() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [consentDraft, setConsentDraft] = useState<Draft | null>(null);
 
+  // Marketplace
+  const [marketQuery, setMarketQuery] = useState('');
+  const [marketEntries, setMarketEntries] = useState<MarketplaceEntry[]>([]);
+  const [marketLoading, setMarketLoading] = useState(false);
+
   // Add server form
   const [form, setForm] = useState<Partial<MCPServerConfig>>({
     transport: 'stdio', name: '', icon: '🔌', enabled: true,
@@ -276,6 +282,17 @@ export default function MCPServerPanel() {
       capabilities: [],
     });
   };
+
+  useEffect(() => {
+    if (!marketQuery.trim()) { setMarketEntries([]); return; }
+    const t = setTimeout(async () => {
+      setMarketLoading(true);
+      const results = await marketplaceStore.search(marketQuery);
+      setMarketEntries(results);
+      setMarketLoading(false);
+    }, 150);
+    return () => clearTimeout(t);
+  }, [marketQuery]);
 
   const connectedIds = new Set(
     mcpClient.getAll().filter(c => c.connected).map(c => c.config.id)
@@ -405,6 +422,33 @@ export default function MCPServerPanel() {
               ))}
             </div>
           )}
+
+          {/* Marketplace */}
+          <div className="mcp-marketplace">
+            <div className="mcp-marketplace-head">
+              <span>Marketplace</span>
+              <input className="mcp-marketplace-search" placeholder="Search servers…" value={marketQuery}
+                onChange={e => setMarketQuery(e.target.value)} />
+            </div>
+            {marketLoading && <div className="mcp-empty-sub">Searching…</div>}
+            {!marketLoading && marketEntries.length === 0 && marketQuery.trim() && (
+              <div className="mcp-empty-sub">No matches</div>
+            )}
+            {!marketLoading && marketEntries.length > 0 && (
+              <div className="mcp-presets">
+                {marketEntries.map(entry => (
+                  <button key={entry.id} className="mcp-preset-btn" onClick={() => setConsentDraft(marketplaceStore.toDraft(entry))}>
+                    <span>{entry.icon}</span>
+                    <div>
+                      <div className="mcp-preset-name">{entry.name}</div>
+                      <div className="mcp-preset-transport">{TRANSPORT_LABELS[entry.transport]}</div>
+                      <div className="mcp-preset-desc">{entry.description}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Custom form */}
           <div className="mcp-form-head">Custom server</div>
