@@ -74,6 +74,38 @@ class AIGateway {
     }
   }
 
+  private fallbackModelIds: string[] = [];
+
+  setFallbackModelIds(ids: string[]) {
+    this.fallbackModelIds = ids.filter(id => MODELS.some(m => m.id === id));
+  }
+
+  async streamWithFallback(messages: Message[], onChunk: StreamHandler, signal?: AbortSignal): Promise<void> {
+    const candidates = [this.modelId, ...this.fallbackModelIds.filter(id => id !== this.modelId)];
+    const tried = new Set<string>();
+
+    for (const candidate of candidates) {
+      if (tried.has(candidate)) continue;
+      tried.add(candidate);
+
+      const previous = this.modelId;
+      this.setModel(candidate);
+      let finalChunk: StreamChunk | undefined;
+      const wrapped: StreamHandler = chunk => { finalChunk = chunk; onChunk(chunk); };
+
+      try {
+        await this.stream(messages, wrapped, signal);
+      } finally {
+        if (tried.size > 1) this.setModel(previous);
+      }
+
+      const hadError = finalChunk?.done && typeof finalChunk.delta === 'string' && finalChunk.delta.startsWith('Error:');
+      if (!hadError) return;
+    }
+
+    onChunk({ delta: 'All models failed.', done: true });
+  }
+
   async complete(prompt: string, opts: { maxTokens?: number; temperature?: number } = {}): Promise<string> {
     let result = '';
     await this.stream([{ role: 'user', content: prompt }], chunk => { result += chunk.delta; });

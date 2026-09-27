@@ -5,6 +5,7 @@
 //   - Maintains backward-compatible API for existing consumers.
 
 import { MCPServerConfig, MCPTool, mcpConfigStore } from './MCPConfigStore';
+import { WASITransport } from './MCPWASITransport';
 
 export interface ToolCallRequest {
   serverId: string;
@@ -48,7 +49,7 @@ class MCPClient {
       return new sdk.WebSocketClientTransport(new URL(config.url!));
     }
     if (config.transport === 'stdio') {
-      throw new Error('Stdio transport requires Node.js environment. Use the WebSocket transport in the browser.');
+      return new WASITransport(config.command!);
     }
     throw new Error(`Unsupported transport: ${(config as any).transport}`);
   }
