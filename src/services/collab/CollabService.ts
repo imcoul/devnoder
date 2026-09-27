@@ -26,12 +26,14 @@ class CollabService {
   private idbProvider: IndexeddbPersistence | null = null;
   private bc: BroadcastChannel | null = null;
   private listeners: Array<() => void> = [];
+  private yTexts = new Map<string, Y.Text>();
 
   onChange(cb: () => void) { this.listeners.push(cb); }
   private notify() { this.listeners.forEach(cb => cb()); }
 
   async join(roomId: string, userName?: string): Promise<CollabSession> {
     await this.leave();
+    this.yTexts.clear();
 
     const doc = new Y.Doc();
 
@@ -95,6 +97,16 @@ class CollabService {
 
   getSharedText(key = 'code'): Y.Text | null {
     return this.session?.doc.getText(key) ?? null;
+  }
+
+  getYText(bufferId: string): Y.Text | null {
+    return this.session?.doc.getText(`buf-${bufferId}`) ?? null;
+  }
+
+  syncBufferToYjs(bufferId: string, content: string): void {
+    const yText = this.getYText(bufferId);
+    if (!yText || yText.length > 0) return;
+    yText.insert(0, content);
   }
 
   getPeers(): Peer[] {
