@@ -84,6 +84,9 @@ registerService(ServiceKey.gitService, () => ({
 import { syncQueue } from './git/SyncQueue';
 registerService(ServiceKey.syncQueue, () => syncQueue);
 
+import { backgroundSync } from './git/BackgroundSync';
+registerService(ServiceKey.backgroundSync, () => backgroundSync);
+
 import { generateCommitMessage } from './git/CommitMessageAI';
 registerService(ServiceKey.commitMessageAI, () => ({ generateCommitMessage }));
 

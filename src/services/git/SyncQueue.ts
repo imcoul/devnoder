@@ -1,5 +1,6 @@
 // SyncQueue.ts — offline push queue with IndexedDB persistence
 import Dexie, { Table } from 'dexie';
+import { backgroundSync, registerSyncTag } from './BackgroundSync';
 
 export interface QueuedPush {
   id?: number;
@@ -35,6 +36,7 @@ export const syncQueue = {
   async enqueue(remote: string, branch: string, commitOid: string): Promise<void> {
     await db.pushQueue.add({ remote, branch, commitOid, queuedAt: Date.now(), attempts: 0, status: 'pending' });
     await notify();
+    registerSyncTag('push-queue');
   },
 
   async getAll(): Promise<QueuedPush[]> {
@@ -67,7 +69,6 @@ export const syncQueue = {
   },
 
   async flush(pushFn: (item: QueuedPush) => Promise<void>): Promise<void> {
-    if (!navigator.onLine) return;
     const pending = await this.getPending();
     for (const item of pending) {
       if (!item.id) continue;
@@ -75,8 +76,16 @@ export const syncQueue = {
       try {
         await pushFn(item);
         await this.markDone(item.id);
+        backgroundSync.cancel(String(item.id));
       } catch (e: any) {
         await this.markFailed(item.id, e.message);
+        if ((item.attempts ?? 0) < 3) {
+          backgroundSync.enqueue(String(item.id), async () => {
+            const pendingItem = await db.pushQueue.get(item.id!);
+            if (pendingItem?.status === 'pending') await this.flush(pushFn);
+          });
+          registerSyncTag('push-queue');
+        }
       }
     }
   },

@@ -79,6 +79,7 @@ export const ServiceKey = {
   bufferManager: 'bufferManager',
   codeSyncEngine: 'codeSyncEngine',
   syncQueue: 'syncQueue',
+  backgroundSync: 'backgroundSync',
   audioCueService: 'audioCueService',
   themeRegistry: 'themeRegistry',
   computePool: 'computePool',
