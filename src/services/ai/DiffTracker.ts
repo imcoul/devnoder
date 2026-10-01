@@ -1,5 +1,6 @@
 // DiffTracker.ts — tracks file changes since last AI message
 import { $buffers } from '../editor/BufferManager';
+import { createPatch as jsCreatePatch } from 'jsdiff';
 
 interface Snapshot { path: string; content: string; }
 
@@ -12,7 +13,14 @@ class DiffTracker {
     }
   }
 
-  getDiff(): string {
+  getDiff(path?: string): string {
+    if (path) {
+      const prev = this.snapshots.get(path);
+      const buf = $buffers.get().find(b => b.path === path);
+      if (!prev || !buf) return '';
+      return jsCreatePatch(path, prev.content, buf.content, 'previous', 'current', { context: 3 });
+    }
+
     const lines: string[] = [];
     for (const buf of $buffers.get()) {
       const prev = this.snapshots.get(buf.path);
@@ -21,21 +29,22 @@ class DiffTracker {
         continue;
       }
       if (prev.content !== buf.content) {
-        const prevLines = prev.content.split('\n');
-        const currLines = buf.content.split('\n');
-        lines.push(`[MODIFIED] ${buf.path}`);
-        // Simple line-level diff (first 20 changed lines)
-        let shown = 0;
-        for (let i = 0; i < Math.max(prevLines.length, currLines.length) && shown < 20; i++) {
-          if (prevLines[i] !== currLines[i]) {
-            if (prevLines[i] !== undefined) lines.push(`- ${prevLines[i]}`);
-            if (currLines[i] !== undefined) lines.push(`+ ${currLines[i]}`);
-            shown++;
-          }
-        }
+        const patch = jsCreatePatch(buf.path, prev.content, buf.content, 'previous', 'current', { context: 3 });
+        lines.push(patch);
       }
     }
-    return lines.join('\n');
+    return lines.join('\n\n');
+  }
+
+  getDiffForPath(path: string): { old: string; new: string; patch: string } | null {
+    const prev = this.snapshots.get(path);
+    const buf = $buffers.get().find(b => b.path === path);
+    if (!prev || !buf) return null;
+    return {
+      old: prev.content,
+      new: buf.content,
+      patch: jsCreatePatch(path, prev.content, buf.content, 'previous', 'current', { context: 3 }),
+    };
   }
 
   clear() { this.snapshots.clear(); }

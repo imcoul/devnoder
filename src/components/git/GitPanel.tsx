@@ -8,9 +8,11 @@ import { gitHubAPI, PullRequest, Issue, CIRun } from '../../services/git/GitHubA
 import { syncQueue, QueuedPush } from '../../services/git/SyncQueue';
 import { generateCommitMessage } from '../../services/git/CommitMessageAI';
 import { bufferManager } from '../../services/editor/BufferManager';
+import { diffTracker } from '../../services/ai/DiffTracker';
+import DiffViewer from '../editor/DiffViewer';
 import './GitPanel.css';
 
-type Tab = 'changes' | 'log' | 'branches' | 'prs' | 'issues' | 'ci';
+type Tab = 'changes' | 'diff' | 'log' | 'branches' | 'prs' | 'issues' | 'ci';
 
 function timeAgo(ts: number): string {
   const s = Math.floor((Date.now() - ts) / 1000);
@@ -35,6 +37,8 @@ export default function GitPanel() {
   const [error, setError]           = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [repoInfo, setRepoInfo]     = useState<{ owner: string; repo: string } | null>(null);
+  const [diffPath, setDiffPath]     = useState<string | null>(null);
+  const [diffPatch, setDiffPatch]   = useState<string>('');
 
   const refresh = useCallback(async () => {
     try {
@@ -113,15 +117,16 @@ export default function GitPanel() {
     <div className="git-panel">
       {/* Tab bar */}
       <div className="git-tabs" role="tablist" aria-label="Git">
-        {(['changes','log','branches','prs','issues','ci'] as Tab[]).map(t => (
+        {(['changes','diff','log','branches','prs','issues','ci'] as Tab[]).map(t => (
           <button key={t} className={`git-tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}
             role="tab" aria-selected={tab === t}>
             {t === 'changes'  && `Changes ${status.filter(f=>f.status!=='unmodified').length ? `(${status.filter(f=>f.status!=='unmodified').length})` : ''}`}
+            {t === 'diff'     && `Diff${diffPath ? ` (${diffPath.split('/').pop()})` : ''}`}
             {t === 'log'      && 'Log'}
             {t === 'branches' && 'Branches'}
             {t === 'prs'      && `PRs${prs.length ? ` (${prs.length})` : ''}`}
             {t === 'issues'   && `Issues${issues.length ? ` (${issues.length})` : ''}`}
-            {t === 'ci'       && `CI${ciRuns.length ? ` (${ciRuns.length})` : ''}`}
+            {t === 'ci'       && `CI`}
           </button>
         ))}
       </div>
@@ -137,7 +142,7 @@ export default function GitPanel() {
             {staged.length > 0 && <button className="git-link" onClick={() => staged.forEach(f=>unstage(f.path))}>Unstage all</button>}
           </div>
           {staged.map(f => (
-            <div key={f.path} className="git-file-row" onClick={() => openFile(f.path)}>
+            <div key={f.path} className="git-file-row" onClick={() => { openFile(f.path); setDiffPath(f.path); setDiffPatch(diffTracker.getDiff(f.path)); setTab('diff'); }}>
               <span className="git-file-status" style={{color: statusColor(f.status)}} aria-hidden="true">{statusIcon(f.status)}</span>
               <span className="git-file-path">{f.path}</span>
               <button className="git-file-btn" aria-label={`Unstage ${f.path}`} onClick={e=>{e.stopPropagation();unstage(f.path);}}>−</button>
@@ -151,7 +156,7 @@ export default function GitPanel() {
             {unstaged.length > 0 && <button className="git-link" onClick={stageEverything}>Stage all</button>}
           </div>
           {unstaged.map(f => (
-            <div key={f.path} className="git-file-row" onClick={() => openFile(f.path)}>
+            <div key={f.path} className="git-file-row" onClick={() => { openFile(f.path); setDiffPath(f.path); setDiffPatch(diffTracker.getDiff(f.path)); }}>
               <span className="git-file-status" style={{color: statusColor(f.status)}} aria-hidden="true">{statusIcon(f.status)}</span>
               <span className="git-file-path">{f.path}</span>
               <button className="git-file-btn git-file-btn--add" aria-label={`Stage ${f.path}`} onClick={e=>{e.stopPropagation();stage(f.path);}}>+</button>
@@ -182,6 +187,35 @@ export default function GitPanel() {
             <div className="git-queue-notice">
               {queue.filter(q=>q.status==='pending').length} push(es) queued for when online
             </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Diff ── */}
+      {tab === 'diff' && (
+        <div className="git-body">
+          {!diffPath ? (
+            <div className="git-empty">
+              <p>Select a file from Changes to view its diff</p>
+              <button className="git-link" onClick={() => { setDiffPath(status[0]?.path ?? null); }}>View first modified file</button>
+            </div>
+          ) : (
+            <>
+              <div className="git-diff-header">
+                <select className="git-diff-select" value={diffPath} onChange={e => {
+                  const path = e.target.value;
+                  setDiffPath(path);
+                  const patch = diffTracker.getDiff(path);
+                  setDiffPatch(patch);
+                }}>
+                  {status.filter(f => f.status !== 'unmodified').map(f => (
+                    <option key={f.path} value={f.path}>{f.staged ? '✓ ' : ''}{f.path}</option>
+                  ))}
+                </select>
+                <button className="git-link" onClick={() => openFile(diffPath)}>Open file</button>
+              </div>
+              <DiffViewer patch={diffPatch} filename={diffPath} />
+            </>
           )}
         </div>
       )}

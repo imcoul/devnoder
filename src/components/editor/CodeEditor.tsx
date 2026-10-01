@@ -16,12 +16,13 @@ const langCompartment   = new Compartment();
 const themeCompartment  = new Compartment();
 const tabCompartment    = new Compartment();
 const wrapCompartment   = new Compartment();
+const historyCompartment = new Compartment();
 
 function baseExtensions(fontSize: number): Extension[] {
   return [
     lineNumbers(),
     highlightActiveLine(),
-    history(),
+    historyCompartment.of([history(), keymap.of(historyKeymap)]),
     foldGutter(),
     indentOnInput(),
     bracketMatching(),
@@ -29,7 +30,7 @@ function baseExtensions(fontSize: number): Extension[] {
     dropCursor(),
     rectangularSelection(),
     crosshairCursor(),
-    keymap.of([...defaultKeymap, ...historyKeymap, ...closeBracketsKeymap, indentWithTab]),
+    keymap.of([...defaultKeymap, ...closeBracketsKeymap, indentWithTab]),
     EditorView.theme({
       '&': { height: '100%', fontSize: `${fontSize}px` },
       '.cm-scroller': { fontFamily: 'var(--font-code)', overflow: 'auto', height: '100%' },
@@ -53,6 +54,7 @@ export default function CodeEditor() {
   const theme       = useStore($theme);
   const ui          = useStore($ui);
   const lastIdRef   = useRef<string | null>(null);
+  const yjsBoundRef = useRef(false);
 
   const activeBuffer = buffers.find(b => b.id === activeId);
 
@@ -70,6 +72,7 @@ export default function CodeEditor() {
         wrapCompartment.of(ui.wordWrap ? EditorView.lineWrapping : []),
         EditorView.updateListener.of(update => {
           if (!update.docChanged) return;
+          if (yjsBoundRef.current) return;
           const id = $activeBuffer.get();
           if (!id) return;
           const content = update.state.doc.toString();
@@ -143,17 +146,46 @@ export default function CodeEditor() {
     const view = viewRef.current;
     if (!view) return;
     let cleanup: (() => void) | undefined;
+    let unobserve: (() => void) | undefined;
 
     import('../../services/collab/CollabService').then(async ({ collabService }) => {
-      const yText = collabService.getSharedText('code');
+      if (!activeId) return;
+      const yText = collabService.getYText(activeId);
       const session = collabService.getSession();
       if (!yText || !session?.awareness) return;
 
+      // Seed Y.Text from the local buffer if this is a fresh Y.Text
+      const buf = $buffers.get().find(b => b.id === activeId);
+      if (buf && yText.length === 0) {
+        yText.insert(0, buf.content);
+      }
+
+      // If Y.Text already has content, it is the source of truth
+      if (yText.length > 0) {
+        view.dispatch({
+          changes: { from: 0, to: view.state.doc.length, insert: yText.toString() },
+        });
+      }
+
       const { bindYjsCollaboration } = await import('./CodeEditor');
       cleanup = await bindYjsCollaboration(view, yText, session.awareness);
+
+      // Sync Y.Text changes back into nanostores so secret detection / RAG
+      // and the rest of the app see the latest content.
+      const handler = () => {
+        bufferManager.update(activeId, yText.toString());
+      };
+      yText.observe(handler);
+      unobserve = () => { yText.unobserve(handler); };
+
+      yjsBoundRef.current = true;
     }).catch(() => {});
 
-    return () => { cleanup?.(); };
+    return () => {
+      yjsBoundRef.current = false;
+      unobserve?.();
+      cleanup?.();
+    };
   }, [activeId]); // re-bind when active buffer changes
 
   // ── Touch: swipe left/right to change buffer ───────────────────────────────
@@ -223,5 +255,7 @@ export async function bindYjsCollaboration(view: EditorView, yText: any, awarene
   const binding = yCollab(yText, awareness, { undoManager });
   const ext = view.state.update({ effects: StateEffect.appendConfig.of([binding]) });
   view.dispatch(ext);
-  return () => (binding as any).destroy?.();
+  return () => {
+    undoManager.destroy?.();
+  };
 }
