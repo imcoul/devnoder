@@ -9,6 +9,7 @@ import InstallPrompt from './components/layout/InstallPrompt';
 import { audioCueService } from './services/accessibility/AudioCueService';
 import { projectService } from './services/project/ProjectService';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { initSentry } from './services/observability/Sentry';
 
 export default function App() {
   const activePanel = useStore($activePanel);
@@ -19,6 +20,10 @@ export default function App() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    initSentry(import.meta.env.VITE_SENTRY_DSN);
+  }, []);
 
   useEffect(() => {
     // First-run gate: if no project has ever been created, land on the

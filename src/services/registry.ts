@@ -80,6 +80,8 @@ export const ServiceKey = {
   codeSyncEngine: 'codeSyncEngine',
   syncQueue: 'syncQueue',
   backgroundSync: 'backgroundSync',
+  tracer: 'tracer',
+  meter: 'meter',
   audioCueService: 'audioCueService',
   themeRegistry: 'themeRegistry',
   computePool: 'computePool',
