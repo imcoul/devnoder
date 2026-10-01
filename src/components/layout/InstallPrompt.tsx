@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { showToast } from '../../stores/ui';
+import './InstallPrompt.css';
 
 export default function InstallPrompt() {
   const [deferred, setDeferred] = useState<any>(null);

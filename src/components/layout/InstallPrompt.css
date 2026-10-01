@@ -1,0 +1,18 @@
+.install-prompt {
+  position: fixed;
+  inset-block-end: calc(var(--nav-height) + env(safe-area-inset-bottom) + 0.75rem);
+  inset-inline-end: 0.75rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-turquoise);
+  background: var(--color-surface);
+  color: var(--color-turquoise);
+  font-weight: 700;
+  font-size: 0.78rem;
+  cursor: pointer;
+  box-shadow: 0 2px 8px #00000040;
+  z-index: 50;
+  -webkit-tap-highlight-color: transparent;
+}
+.install-prompt:hover { background: #40E0D015; }
+.install-prompt:active { transform: scale(0.96); }
