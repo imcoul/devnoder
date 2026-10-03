@@ -10,7 +10,7 @@ script_name = "devnoder-collab"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["CollabRoom"]
+new_sqlite_classes = ["CollabRoom"]
 
 [[d1_databases]]
 binding = "DB"

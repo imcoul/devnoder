@@ -1,8 +1,9 @@
 // MCPWASITransport.ts — WASI stdio transport for MCP servers (Sprint 2 stub).
 //
 // A full implementation requires a WASI runtime with Node.js polyfills
-// (e.g. wasmedge-quickjs). This stub documents the interface and falls
-// back to the WebSocket bridge so stdio servers remain usable in the browser.
+// (e.g. wasmedge-quickjs or @quickjs/ffi). This stub documents the
+// interface and emits a clear error so stdio servers can still be used
+// by routing through a WebSocket bridge instead.
 import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 
 type MCPMessage = Record<string, unknown>;
@@ -14,11 +15,17 @@ export class WASITransport implements Transport {
 
   constructor(private command: string, private args: string[] = []) {}
 
+  static isSupported(): boolean {
+    // TODO (Sprint 2+): return true when a WASI runtime is detected.
+    // For now, always false so callers can fall back to WebSocket.
+    return false;
+  }
+
   async start(): Promise<void> {
-    // TODO (Sprint 2+): spawn the command in a QuickJS/WASI context and
-    // bridge stdin/stdout to the MCP SDK's Transport interface.
-    // See: https://github.com/second-state/wasmedge-quickjs
-    this.onerror?.(new Error('WASI stdio transport is not yet implemented. Configure this server as a WebSocket server or run it via the Termux WS bridge.'));
+    const reason = 'WASI stdio transport is not available in this build. '
+      + 'Run your MCP server as a WebSocket server and use the WebSocket transport, '
+      + 'or use the Termux WebSocket bridge to reach a stdio server.';
+    this.onerror?.(new Error(reason));
   }
 
   async close(): Promise<void> {
@@ -26,6 +33,6 @@ export class WASITransport implements Transport {
   }
 
   async send(_message: MCPMessage): Promise<void> {
-    // no-op until start() is fully implemented
+    // no-op until a WASI runtime is wired up
   }
 }
