@@ -6,6 +6,7 @@ import BottomNav from './components/layout/BottomNav';
 import CommandPalette from './components/layout/CommandPalette';
 import ToastContainer from './components/layout/ToastContainer';
 import InstallPrompt from './components/layout/InstallPrompt';
+import OfflineBanner from './components/layout/OfflineBanner';
 import { audioCueService } from './services/accessibility/AudioCueService';
 import { projectService } from './services/project/ProjectService';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -126,6 +127,7 @@ export default function App() {
         <CommandPalette />
         <ToastContainer />
         <InstallPrompt />
+        <OfflineBanner />
       </div>
     </ErrorBoundary>
   );
