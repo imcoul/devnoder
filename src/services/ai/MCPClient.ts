@@ -49,6 +49,9 @@ class MCPClient {
       return new sdk.WebSocketClientTransport(new URL(config.url!));
     }
     if (config.transport === 'stdio') {
+      if (!WASITransport.isSupported()) {
+        throw new Error('Stdio MCP servers are not yet supported in the browser. Use a WebSocket bridge or switch the server to WebSocket/SSE transport.');
+      }
       return new WASITransport(config.command!);
     }
     throw new Error(`Unsupported transport: ${(config as any).transport}`);

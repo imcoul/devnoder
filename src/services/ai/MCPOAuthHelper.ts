@@ -60,16 +60,17 @@ export class MCPOAuthHelper {
   }
 
   async exchangeCode(serverId: string, code: string, authUrl: string): Promise<Omit<MCPOAuthToken, 'id'> | undefined> {
-    // Placeholder: real implementation needs a token endpoint from the MCP server's
-    // OAuth discovery metadata. For Sprint 2 we persist the code and leave the
-    // actual token exchange to a backend proxy or a future phase.
+    // Placeholder: a real token exchange needs a token endpoint from the MCP
+    // server's OAuth discovery metadata (.well-known/oauth-authorization-server).
+    // For now we return undefined so the caller knows the flow is incomplete.
     console.warn('[MCPOAuthHelper] token exchange not implemented — code:', code);
-    return {
-      serverId,
-      accessToken: `pending-${code}`,
-      expiresAt: Date.now() + 3600_000,
-      scope: '',
-    };
+    return undefined;
+  }
+
+  static isSupported(): boolean {
+    // TODO (Sprint 2+): return true when a backend token-exchange proxy or
+    // direct token endpoint is configured for the MCP server.
+    return false;
   }
 
   async getToken(serverId: string): Promise<MCPOAuthToken | undefined> {
