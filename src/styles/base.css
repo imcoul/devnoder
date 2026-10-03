@@ -18,5 +18,9 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); }
 button, input, select, textarea { font-family: inherit; }
+:focus-visible { outline: 2px solid var(--color-turquoise); outline-offset: 2px; }
 a { color: var(--color-turquoise); }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(0.15rem); } to { opacity: 1; transform: translateY(0); } }
+
+.panel-enter { animation: fadeIn 150ms ease-out; }

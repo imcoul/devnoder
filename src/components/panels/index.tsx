@@ -85,7 +85,7 @@ export function PanelShell({ panelId }: { panelId: string }) {
   const Component = meta.component;
   return (
     <Suspense fallback={<PanelFallback id={meta.label} />}>
-      <Component />
+      <div className="panel-enter"><Component /></div>
     </Suspense>
   );
 }
