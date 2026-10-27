@@ -174,7 +174,7 @@ export async function push(remote = 'origin', branch?: string, token?: string): 
   const ref = branch ?? (await git.currentBranch({ fs, dir })) ?? 'main';
   await git.push({
     fs, http, dir, remote, ref,
-    onAuth: token ? () => ({ username: token }) : undefined,
+    onAuth: token ? () => ({ username: 'x-access-token', password: token }) : undefined,
   });
 }
 
@@ -184,7 +184,7 @@ export async function pull(remote = 'origin', branch?: string, token?: string): 
   await git.pull({
     fs, http, dir, remote, ref,
     author: { name: 'DevNoder User', email: 'dev@srvel.io' },
-    onAuth: token ? () => ({ username: token }) : undefined,
+    onAuth: token ? () => ({ username: 'x-access-token', password: token }) : undefined,
   });
 }
 
@@ -193,7 +193,7 @@ export async function clone(url: string, token?: string): Promise<void> {
   await fs.promises.mkdir('/projects').catch(() => {});
   await git.clone({
     fs, http, dir, url,
-    onAuth: token ? () => ({ username: token }) : undefined,
+    onAuth: token ? () => ({ username: 'x-access-token', password: token }) : undefined,
     singleBranch: true,
     depth: 10,
   });
@@ -204,10 +204,31 @@ export async function addRemote(name: string, url: string): Promise<void> {
   await git.addRemote({ fs, dir, remote: name, url });
 }
 
+export async function setRemote(name: string, url: string): Promise<void> {
+  const dir = getDir();
+  const remotes = await git.listRemotes({ fs, dir });
+  if (remotes.some(remote => remote.remote === name)) {
+    await git.setConfig({ fs, dir, path: `remote.${name}.url`, value: url });
+    return;
+  }
+  await git.addRemote({ fs, dir, remote: name, url });
+}
+
+export async function listRemotes(): Promise<Array<{ remote: string; url: string }>> {
+  const dir = getDir();
+  return git.listRemotes({ fs, dir });
+}
+
 export async function readFile(filepath: string): Promise<string> {
   const dir = getDir();
   const raw = await fs.promises.readFile(`${dir}/${normalizeProjectPath(filepath)}`, { encoding: 'utf8' });
   return typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
+}
+
+export async function readFileBytes(filepath: string): Promise<Uint8Array> {
+  const dir = getDir();
+  const raw = await fs.promises.readFile(`${dir}/${normalizeProjectPath(filepath)}`);
+  return typeof raw === 'string' ? new TextEncoder().encode(raw) : new Uint8Array(raw);
 }
 
 export async function writeFile(filepath: string, content: string): Promise<void> {

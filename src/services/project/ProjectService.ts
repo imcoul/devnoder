@@ -5,6 +5,7 @@ import { db, ProjectRecord, getSetting, setSetting } from '../storage/db';
 import {
   fs, initRepo, clone, stageAll, commit, setActiveProject,
 } from '../git/GitService';
+import { gitHubAPI } from '../git/GitHubAPI';
 import { templateService } from '../templates/TemplateService';
 import { bufferManager } from '../editor/BufferManager';
 import { setProjectContext, createProjectContext } from '../../stores/projectContext';
@@ -100,7 +101,12 @@ export const projectService = {
     setActiveProject(record.id);
     await setSetting(LAST_ACTIVE_KEY, record.id);
     setProjectContext(createProjectContext(record));
-    await clone(url, token);
+    let cloneToken = token;
+    if (!cloneToken && gitHubAPI.parseRemoteUrl(url)) {
+      await gitHubAPI.loadToken();
+      cloneToken = gitHubAPI.getAccessToken() ?? undefined;
+    }
+    await clone(url, cloneToken);
     return record;
   },
 

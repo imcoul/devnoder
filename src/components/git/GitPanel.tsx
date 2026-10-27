@@ -3,7 +3,8 @@ import { useStore } from '@nanostores/react';
 import {
   initRepo, getStatus, stageFile, unstageFile, stageAll,
   commit, getLog, getBranches, createBranch, checkoutBranch,
-  listFiles, writeFile, normalizeProjectPath,
+  listFiles, listRemotes, setRemote, push as pushRemote, pull as pullRemote,
+  readFile, writeFile, normalizeProjectPath,
   FileStatus, CommitEntry, Branch,
 } from '../../services/git/GitService';
 import { gitHubAPI, PullRequest, Issue, CIRun } from '../../services/git/GitHubAPI';
@@ -11,6 +12,9 @@ import { syncQueue, QueuedPush } from '../../services/git/SyncQueue';
 import { generateCommitMessage } from '../../services/git/CommitMessageAI';
 import { $buffers, bufferManager } from '../../services/editor/BufferManager';
 import { diffTracker } from '../../services/ai/DiffTracker';
+import { createProjectArchive } from '../../services/project/ProjectArchive';
+import { db } from '../../services/storage/db';
+import { $projectContext } from '../../stores/projectContext';
 import DiffViewer from '../editor/DiffViewer';
 import './GitPanel.css';
 
@@ -34,30 +38,51 @@ export default function GitPanel() {
   const [prs, setPRs]               = useState<PullRequest[]>([]);
   const [issues, setIssues]         = useState<Issue[]>([]);
   const [ciRuns, setCiRuns]           = useState<CIRun[]>([]);
+  const projectContext = useStore($projectContext);
   const [queue, setQueue]           = useState<QueuedPush[]>([]);
   const [commitMsg, setCommitMsg]   = useState('');
   const [newBranch, setNewBranch]   = useState('');
   const [newFilePath, setNewFilePath] = useState('');
   const [creatingFile, setCreatingFile] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [repoInfo, setRepoInfo]     = useState<{ owner: string; repo: string } | null>(null);
+  const [githubAuthReady, setGithubAuthReady] = useState(false);
+  const [githubConnected, setGithubConnected] = useState(false);
+  const [githubTokenInput, setGithubTokenInput] = useState('');
+  const [githubConnecting, setGithubConnecting] = useState(false);
+  const [remoteUrl, setRemoteUrl] = useState('');
+  const [remoteDraft, setRemoteDraft] = useState('');
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [diffPath, setDiffPath]     = useState<string | null>(null);
   const [diffPatch, setDiffPatch]   = useState<string>('');
 
   const refresh = useCallback(async () => {
     try {
       await initRepo();
-      const [s, l, b, f] = await Promise.all([getStatus(), getLog(), getBranches(), listFiles()]);
+      const [s, l, b, f, remotes] = await Promise.all([getStatus(), getLog(), getBranches(), listFiles(), listRemotes()]);
       setStatus(s); setLog(l); setBranches(b); setFiles(f.sort((a, b) => a.localeCompare(b)));
+      const origin = remotes.find(remote => remote.remote === 'origin');
+      setRemoteUrl(origin?.url ?? '');
+      if (origin) setRemoteDraft(current => current || origin.url);
+      if (origin && gitHubAPI.parseRemoteUrl(origin.url)) localStorage.setItem('devnoder-remote-url', origin.url);
     } catch (e: any) { setError(e.message); }
   }, []);
 
   useEffect(() => {
     refresh();
     syncQueue.onUpdate(setQueue);
-    gitHubAPI.loadToken();
+    void gitHubAPI.loadToken().then(connected => {
+      setGithubConnected(connected);
+      setGithubAuthReady(true);
+    }).catch(() => {
+      setGithubConnected(false);
+      setGithubAuthReady(true);
+    });
   }, [refresh]);
 
   const persistedBufferKey = buffers
@@ -91,6 +116,31 @@ export default function GitPanel() {
       await refresh();
     } catch (e: any) {
       setError(e.message);
+    }
+  };
+
+  const exportProject = async () => {
+    if (exporting) return;
+    setExporting(true);
+    setError(null);
+    setExportMessage(null);
+    let objectUrl: string | null = null;
+    try {
+      const archive = await createProjectArchive();
+      objectUrl = URL.createObjectURL(archive.blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = archive.filename;
+      link.hidden = true;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setExportMessage(`Downloaded ${archive.filename} (${archive.fileCount} files)`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Project ZIP export failed.');
+    } finally {
+      if (objectUrl) window.setTimeout(() => URL.revokeObjectURL(objectUrl!), 1000);
+      setExporting(false);
     }
   };
 
@@ -135,7 +185,122 @@ export default function GitPanel() {
     } catch (e: any) { setError(e.message); }
   };
 
-  useEffect(() => { if (tab === 'prs' || tab === 'issues' || tab === 'ci') loadGH(); }, [tab]);
+  const connectGitHubToken = async () => {
+    setGithubConnecting(true);
+    setError(null);
+    try {
+      await gitHubAPI.connectWithToken(githubTokenInput);
+      setGithubTokenInput('');
+      setGithubConnected(true);
+      if (tab === 'prs' || tab === 'issues' || tab === 'ci') await loadGH();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'GitHub connection failed.');
+    } finally {
+      setGithubConnecting(false);
+    }
+  };
+
+  const configureRemote = async () => {
+    const parsed = gitHubAPI.parseRemoteUrl(remoteDraft.trim());
+    if (!parsed) {
+      setError('Enter an HTTPS or SSH repository URL hosted on github.com.');
+      return;
+    }
+    const url = `https://github.com/${parsed.owner}/${parsed.repo}.git`;
+    setSyncBusy(true);
+    setError(null);
+    setSyncMessage(null);
+    try {
+      await setRemote('origin', url);
+      if (projectContext?.project) {
+        await db.projects.put({ ...projectContext.project, gitRemote: url, updatedAt: Date.now() });
+      }
+      localStorage.setItem('devnoder-remote-url', url);
+      setRemoteDraft('');
+      setRemoteUrl(url);
+      setSyncMessage('GitHub origin saved. Commit changes, then push or pull.');
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save this GitHub remote.');
+    } finally {
+      setSyncBusy(false);
+    }
+  };
+
+  const syncProject = async (direction: 'push' | 'pull') => {
+    if (syncBusy) return;
+    setSyncBusy(true);
+    setError(null);
+    setSyncMessage(null);
+    try {
+      if (!remoteUrl) throw new Error('Set a GitHub origin before syncing.');
+      if (!await gitHubAPI.loadToken()) throw new Error('Connect a GitHub token in the PRs, Issues, or CI tab first.');
+      await bufferManager.saveAll();
+      const currentStatus = await getStatus();
+      if (currentStatus.some(file => file.status !== 'unmodified')) {
+        throw new Error('Commit or discard local changes before syncing so no work is silently omitted or overwritten.');
+      }
+
+      if (direction === 'push') {
+        await pushRemote('origin', undefined, gitHubAPI.getAccessToken() ?? undefined);
+        setSyncMessage('Push completed.');
+      } else {
+        const openBuffers = buffers.filter(buffer => buffer.projectId === projectContext?.project?.id);
+        await pullRemote('origin', undefined, gitHubAPI.getAccessToken() ?? undefined);
+        for (const buffer of openBuffers) {
+          try {
+            bufferManager.replaceSaved(buffer.path, await readFile(buffer.path));
+          } catch {
+            await bufferManager.close(buffer.id);
+          }
+        }
+        setSyncMessage('Pull completed. Open files were refreshed from the updated project.');
+      }
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : `Git ${direction} failed.`);
+    } finally {
+      setSyncBusy(false);
+    }
+  };
+
+  const githubAuthPrompt = (message: string) => (
+    <div className="git-auth-prompt">
+      <p>{message}</p>
+      <label className="git-token-field">
+        GitHub personal access token
+        <input type="password" autoComplete="new-password" spellCheck={false}
+          aria-label="GitHub personal access token" value={githubTokenInput}
+          onChange={event => setGithubTokenInput(event.target.value)} />
+      </label>
+      <button className="git-commit-btn" onClick={connectGitHubToken}
+        disabled={!githubAuthReady || githubConnecting || !githubTokenInput.trim()}>
+        {githubConnecting ? 'Checking token…' : 'Connect with token'}
+      </button>
+      <p className="git-token-note">Use a fine-grained token with only the repository permissions you need. Remote sync requires Contents read/write; PRs, issues and Actions need their matching read permissions. The token is encrypted in this browser’s device-bound vault; active same-origin scripts can still access it while connected.</p>
+    </div>
+  );
+
+  const disconnectGitHub = () => {
+    gitHubAPI.clearToken();
+    setGithubConnected(false);
+    setPRs([]);
+    setIssues([]);
+    setCiRuns([]);
+    setRepoInfo(null);
+    setSyncMessage('GitHub token removed from this browser.');
+  };
+
+  const githubConnectedHeader = githubConnected ? (
+    <div className="git-section-head">
+      <span>GitHub connected</span>
+      <button className="git-link" onClick={disconnectGitHub}>Disconnect</button>
+    </div>
+  ) : null;
+
+  useEffect(() => {
+    if (githubAuthReady && (tab === 'prs' || tab === 'issues' || tab === 'ci')) void loadGH();
+  }, [tab, githubAuthReady, githubConnected]);
 
   const staged   = status.filter(f => f.staged);
   const unstaged = status.filter(f => !f.staged && f.status !== 'unmodified');
@@ -171,10 +336,16 @@ export default function GitPanel() {
         <div className="git-body">
           <div className="git-section-head">
             <span>Project files</span>
-            <button className="git-link" onClick={() => setCreatingFile(value => !value)}>
-              {creatingFile ? 'Cancel' : '+ New file'}
-            </button>
+            <div className="git-file-actions">
+              <button className="git-link" onClick={exportProject} disabled={exporting} aria-label="Download project ZIP">
+                {exporting ? 'Preparing ZIP…' : 'Download ZIP'}
+              </button>
+              <button className="git-link" onClick={() => setCreatingFile(value => !value)}>
+                {creatingFile ? 'Cancel' : '+ New file'}
+              </button>
+            </div>
           </div>
+          {exportMessage && <div className="git-export-status" role="status">{exportMessage}</div>}
           {creatingFile && (
             <form className="git-new-branch" onSubmit={createFile}>
               <input className="git-branch-input" autoFocus value={newFilePath}
@@ -201,6 +372,31 @@ export default function GitPanel() {
       {/* ── Changes ── */}
       {tab === 'changes' && (
         <div className="git-body">
+          <div className="git-section-head"><span>GitHub remote</span></div>
+          <form className="git-remote-form" onSubmit={event => { event.preventDefault(); void configureRemote(); }}>
+            <label htmlFor="git-remote-url">HTTPS or SSH GitHub repository URL</label>
+            <div className="git-remote-input-row">
+              <input id="git-remote-url" value={remoteDraft} onChange={event => setRemoteDraft(event.target.value)}
+                placeholder="https://github.com/owner/repository.git" autoCapitalize="none" autoCorrect="off" />
+              <button className="git-commit-btn" type="submit" disabled={!remoteDraft.trim() || syncBusy}>
+                {remoteUrl ? 'Update origin' : 'Save origin'}
+              </button>
+            </div>
+          </form>
+          <div className="git-remote-sync">
+            <div className="git-remote-url" title={remoteUrl}>{remoteUrl || 'No origin configured'}</div>
+            <div className="git-remote-buttons">
+              <button className="git-commit-btn" onClick={() => void syncProject('pull')} disabled={!remoteUrl || syncBusy}>
+                {syncBusy ? 'Syncing…' : 'Pull'}
+              </button>
+              <button className="git-commit-btn" onClick={() => void syncProject('push')} disabled={!remoteUrl || syncBusy}>
+                {syncBusy ? 'Syncing…' : 'Push'}
+              </button>
+            </div>
+            {!githubConnected && <p className="git-token-note">Connect a fine-grained GitHub token in the PRs, Issues, or CI tab before syncing. Commit local changes before push/pull.</p>}
+            {syncMessage && <p className="git-sync-status" role="status">{syncMessage}</p>}
+          </div>
+
           {/* Staged */}
           <div className="git-section-head">
             <span>Staged ({staged.length})</span>
@@ -334,11 +530,9 @@ export default function GitPanel() {
       {/* ── PRs ── */}
       {tab === 'prs' && (
         <div className="git-body">
-          {!gitHubAPI.isAuthed()
-            ? <div className="git-auth-prompt">
-                <p>Connect GitHub to see pull requests</p>
-                <button className="git-commit-btn" onClick={() => gitHubAPI.startOAuth()}>Connect GitHub</button>
-              </div>
+          {githubConnectedHeader}
+          {!githubConnected
+            ? githubAuthPrompt(githubAuthReady ? 'Connect GitHub to see pull requests' : 'Checking saved GitHub connection…')
             : prs.length === 0
               ? <p className="git-empty">No open pull requests</p>
               : prs.map(pr => (
@@ -355,11 +549,9 @@ export default function GitPanel() {
       {/* ── CI/CD ── */}
       {tab === 'ci' && (
         <div className="git-body">
-          {!gitHubAPI.isAuthed()
-            ? <div className="git-auth-prompt">
-                <p>Connect GitHub to see CI/CD runs</p>
-                <button className="git-commit-btn" onClick={() => gitHubAPI.startOAuth()}>Connect GitHub</button>
-              </div>
+          {githubConnectedHeader}
+          {!githubConnected
+            ? githubAuthPrompt(githubAuthReady ? 'Connect GitHub to see CI/CD runs' : 'Checking saved GitHub connection…')
             : ciRuns.length === 0
               ? <p className="git-empty">No workflow runs found</p>
               : ciRuns.map(run => (
@@ -382,11 +574,9 @@ export default function GitPanel() {
       {/* ── Issues ── */}
       {tab === 'issues' && (
         <div className="git-body">
-          {!gitHubAPI.isAuthed()
-            ? <div className="git-auth-prompt">
-                <p>Connect GitHub to see issues</p>
-                <button className="git-commit-btn" onClick={() => gitHubAPI.startOAuth()}>Connect GitHub</button>
-              </div>
+          {githubConnectedHeader}
+          {!githubConnected
+            ? githubAuthPrompt(githubAuthReady ? 'Connect GitHub to see issues' : 'Checking saved GitHub connection…')
             : issues.length === 0
               ? <p className="git-empty">No open issues</p>
               : issues.map(issue => (

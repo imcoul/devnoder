@@ -1,6 +1,7 @@
 // SyncQueue.ts — offline push queue with IndexedDB persistence
 import Dexie, { Table } from 'dexie';
 import { backgroundSync, registerSyncTag } from './BackgroundSync';
+import { gitHubAPI } from './GitHubAPI';
 
 export interface QueuedPush {
   id?: number;
@@ -95,7 +96,8 @@ export const syncQueue = {
 window.addEventListener('online', () => {
   syncQueue.flush(async (item) => {
     const { push } = await import('./GitService');
-    const token = localStorage.getItem('devnoder-gh-token') ?? undefined;
+    await gitHubAPI.loadToken();
+    const token = gitHubAPI.getAccessToken() ?? undefined;
     await push(item.remote, item.branch, token);
   });
 });

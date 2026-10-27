@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useStore } from '@nanostores/react';
 import { $buffers, $activeBuffer } from '../../services/editor/BufferManager';
+import { bufferManager } from '../../services/editor/BufferManager';
 import { previewService, PreviewLog, DeployResult, TunnelResult } from '../../services/preview/PreviewService';
 import { listFiles, readFile } from '../../services/git/GitService';
 import './PreviewPanel.css';
@@ -17,6 +18,9 @@ function timeAgo(ts: number) {
 export default function PreviewPanel() {
   const [tab, setTab]           = useState<Tab>('preview');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewMessage, setPreviewMessage] = useState<string | null>(null);
+  const [previewWarnings, setPreviewWarnings] = useState<string[]>([]);
+  const [previewBuilding, setPreviewBuilding] = useState(false);
   const [tunnel, setTunnel]     = useState<TunnelResult | null>(null);
   const [qrSvg, setQrSvg]       = useState<string | null>(null);
   const [deploying, setDeploying] = useState(false);
@@ -30,20 +34,50 @@ export default function PreviewPanel() {
   const activeBuffer = buffers.find(b => b.id === activeId);
 
   useEffect(() => {
-    previewService.onLog(log => setLogs(prev => [...prev, log]));
+    const handleLog = (log: PreviewLog) => setLogs(prev => [...prev, log]);
+    previewService.onLog(handleLog);
     setHistory(previewService.getDeployHistory());
-    return () => { previewService.cleanup(); };
+    return () => { previewService.offLog(handleLog); previewService.cleanup(); };
   }, []);
 
   useEffect(() => { logsEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [logs]);
 
-  const buildPreview = useCallback(() => {
-    const html = activeBuffer?.content ?? '<h1>No file open</h1>';
-    const url = previewService.buildBlobPreview(html);
-    setPreviewUrl(url);
-  }, [activeBuffer]);
+  const buildPreview = useCallback(async () => {
+    setPreviewBuilding(true);
+    setPreviewMessage(null);
+    try {
+      await bufferManager.saveAll();
+      const paths = await listFiles();
+      const files: Record<string, string> = {};
+      for (const path of paths) files[path] = await readFile(path);
+      const htmlPaths = paths.filter(path => /\.html?$/i.test(path));
+      const entryPath = files['index.html'] !== undefined
+        ? 'index.html'
+        : activeBuffer?.path && files[activeBuffer.path] !== undefined && /\.html?$/i.test(activeBuffer.path)
+          ? activeBuffer.path
+          : htmlPaths[0];
+      if (!entryPath) {
+        setPreviewUrl(null);
+        setPreviewWarnings([]);
+        setPreviewMessage('No HTML entry file found. Create index.html or open an HTML file to preview this static project.');
+        return;
+      }
+      const built = previewService.buildProjectBlobPreview(files, entryPath);
+      setPreviewUrl(built.url);
+      setPreviewWarnings(built.warnings);
+    } catch (error) {
+      setPreviewUrl(null);
+      setPreviewMessage(error instanceof Error ? error.message : 'The project preview could not be built.');
+    } finally {
+      setPreviewBuilding(false);
+    }
+  }, [activeBuffer?.path]);
 
-  useEffect(() => { if (tab === 'preview') buildPreview(); }, [tab, activeBuffer?.content]);
+  useEffect(() => {
+    if (tab !== 'preview') return;
+    const timer = window.setTimeout(() => { void buildPreview(); }, 250);
+    return () => window.clearTimeout(timer);
+  }, [tab, activeBuffer?.path, activeBuffer?.content, buildPreview]);
 
   const openTunnel = async () => {
     setTunneling(true);
@@ -92,16 +126,25 @@ export default function PreviewPanel() {
       {tab === 'preview' && (
         <div className="preview-body">
           <div className="preview-toolbar">
-            <button className="preview-btn" onClick={buildPreview}>↺ Refresh</button>
+            <button className="preview-btn" onClick={() => void buildPreview()} disabled={previewBuilding}>
+              {previewBuilding ? 'Building…' : '↺ Refresh'}
+            </button>
             {previewUrl && (
-              <span className="preview-url-label">blob preview</span>
+              <span className="preview-url-label">Project snapshot · {activeBuffer?.path ?? 'index.html'}</span>
             )}
           </div>
+          {previewMessage && <div className="preview-warning" role="status">{previewMessage}</div>}
+          {previewWarnings.length > 0 && (
+            <div className="preview-warning" role="status">
+              <strong>Preview limits</strong>
+              <ul>{previewWarnings.map((warning, index) => <li key={`${index}:${warning}`}>{warning}</li>)}</ul>
+            </div>
+          )}
           {previewUrl
             ? <iframe className="preview-frame" src={previewUrl} title="Live preview"
-                sandbox="allow-scripts allow-same-origin" />
+                sandbox="allow-scripts" />
             : <div className="preview-empty">
-                <span>👁</span><p>Open an HTML file to preview</p>
+                <span>👁</span><p>{previewMessage ?? 'Create or open an HTML file to preview this project'}</p>
               </div>
           }
         </div>

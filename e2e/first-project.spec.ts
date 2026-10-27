@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import { strFromU8, unzipSync } from 'fflate';
 
 test('create a project, create and edit a source file, then recover it after reload', async ({ page }) => {
   const pageErrors: string[] = [];
@@ -32,6 +34,18 @@ test('create a project, create and edit a source file, then recover it after rel
   await page.keyboard.type('console.log("saved across reload");');
   await expect(editor).toContainText('saved across reload');
   await expect(page.getByRole('status')).toHaveText('Saved', { timeout: 10_000 });
+
+  await navigation.getByRole('button', { name: /git/i }).click();
+  await page.getByRole('tab', { name: /^Files/ }).click();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download project ZIP' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('browser-acceptance-project.zip');
+  const archivePath = await download.path();
+  expect(archivePath).toBeTruthy();
+  const archive = unzipSync(new Uint8Array(await readFile(archivePath!)));
+  expect(strFromU8(archive['src/main.js'])).toContain('saved across reload');
+  expect(archive['.git/config']).toBeUndefined();
 
   await page.reload();
   await expect(createBlank).toHaveCount(0);

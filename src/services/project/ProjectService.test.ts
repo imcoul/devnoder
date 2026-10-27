@@ -30,6 +30,14 @@ vi.mock('../git/GitService', () => ({
   commit: vi.fn(),
 }));
 
+vi.mock('../git/GitHubAPI', () => ({
+  gitHubAPI: {
+    loadToken: vi.fn(async () => false),
+    getAccessToken: vi.fn(() => null),
+    parseRemoteUrl: vi.fn((url: string) => url.includes('github.com') ? { owner: 'owner', repo: 'repo' } : null),
+  },
+}));
+
 vi.mock('../templates/TemplateService', () => ({
   templateService: {
     apply: vi.fn(() => Promise.resolve({ errors: [] })),
@@ -89,6 +97,13 @@ describe('ProjectService', () => {
     const record = await projectService.importProject('Imported', 'https://github.com/test/repo.git');
     expect(record.name).toBe('Imported');
     expect(record.gitRemote).toBe('https://github.com/test/repo.git');
+  });
+
+  it('does not reuse the saved GitHub token for a non-GitHub remote', async () => {
+    const { gitHubAPI } = await import('../git/GitHubAPI');
+    await projectService.importProject('Other Git host', 'https://git.example.test/repo.git');
+    expect(gitHubAPI.loadToken).not.toHaveBeenCalled();
+    expect(gitHubAPI.getAccessToken).not.toHaveBeenCalled();
   });
 
   it('renameProject updates name', async () => {

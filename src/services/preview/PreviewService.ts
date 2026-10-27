@@ -1,6 +1,7 @@
 // PreviewService.ts — local iframe + Cloudflare Tunnel + deploy
 import { cloudExecutor } from '../terminal/CloudExecutor';
 import { EXECUTOR_BASE_URL } from '../../config/serviceEndpoints';
+import { buildProjectPreviewHtml } from './ProjectPreviewBuilder';
 
 export interface DeployResult { url: string; id: string; timestamp: number; }
 export interface TunnelResult { url: string; port: number; active: boolean; }
@@ -27,10 +28,21 @@ class PreviewService {
 
   /** Build a blob URL from the active HTML buffer for iframe preview */
   buildBlobPreview(html: string): string {
+    const built = buildProjectPreviewHtml({ 'index.html': html }, 'index.html');
+    return this.createPreviewBlob(built.html, 'Preview built from HTML buffer');
+  }
+
+  buildProjectBlobPreview(files: Record<string, string>, entryPath: string): { url: string; warnings: string[] } {
+    const built = buildProjectPreviewHtml(files, entryPath);
+    const url = this.createPreviewBlob(built.html, `Preview built from ${entryPath}`);
+    return { url, warnings: built.warnings };
+  }
+
+  private createPreviewBlob(html: string, logMessage: string): string {
     if (this.blobUrl) URL.revokeObjectURL(this.blobUrl);
     const blob = new Blob([html], { type: 'text/html' });
     this.blobUrl = URL.createObjectURL(blob);
-    this.log('info', 'Preview built from buffer');
+    this.log('info', logMessage);
     return this.blobUrl;
   }
 

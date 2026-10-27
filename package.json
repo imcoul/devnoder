@@ -47,6 +47,7 @@
     "buffer": "^6.0.3",
     "codemirror": "^6.0.2",
     "dexie": "^4.4.4",
+    "fflate": "^0.8.3",
     "grapesjs": "^0.23.2",
     "grapesjs-preset-webpage": "^1.0.3",
     "i18next": "^26.3.3",

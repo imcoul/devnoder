@@ -1,9 +1,12 @@
 // GitHubAPI.ts — PRs, Issues, CI status, OAuth token exchange
 import { GITHUB_OAUTH_WORKER_URL } from '../../config/serviceEndpoints';
+import { cryptoVault } from '../security/CryptoVault';
 
 const OAUTH_WORKER = GITHUB_OAUTH_WORKER_URL;
 const API = 'https://api.github.com';
 const CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID ?? 'Ov23liHoswnxGH0oVEbS';
+const ENCRYPTED_TOKEN_KEY = 'devnoder-gh-token-encrypted-v1';
+const LEGACY_TOKEN_KEY = 'devnoder-gh-token';
 
 export interface GHRepo { owner: string; repo: string; }
 export interface PullRequest {
@@ -25,16 +28,67 @@ export interface CIRun {
 class GitHubAPI {
   private token: string | null = null;
 
-  setToken(t: string) {
-    this.token = t;
-    localStorage.setItem('devnoder-gh-token', t);
+  async setToken(t: string): Promise<void> {
+    const value = t.trim();
+    if (!value) throw new Error('GitHub token cannot be empty.');
+    const encrypted = await cryptoVault.encrypt(value);
+    localStorage.setItem(ENCRYPTED_TOKEN_KEY, encrypted);
+    localStorage.removeItem(LEGACY_TOKEN_KEY);
+    this.token = value;
   }
-  loadToken() {
-    this.token = localStorage.getItem('devnoder-gh-token');
-    return !!this.token;
+
+  async loadToken(): Promise<boolean> {
+    if (this.token) return true;
+    const encrypted = localStorage.getItem(ENCRYPTED_TOKEN_KEY);
+    if (encrypted) {
+      const decrypted = await cryptoVault.decrypt(encrypted);
+      if (decrypted) {
+        this.token = decrypted;
+        return true;
+      }
+      localStorage.removeItem(ENCRYPTED_TOKEN_KEY);
+    }
+
+    const legacy = localStorage.getItem(LEGACY_TOKEN_KEY);
+    if (!legacy) return false;
+    try {
+      await this.setToken(legacy);
+      return true;
+    } catch {
+      this.token = null;
+      return false;
+    }
   }
-  clearToken() { this.token = null; localStorage.removeItem('devnoder-gh-token'); }
+
+  clearToken() {
+    this.token = null;
+    localStorage.removeItem(ENCRYPTED_TOKEN_KEY);
+    localStorage.removeItem(LEGACY_TOKEN_KEY);
+  }
+
   isAuthed() { return !!this.token; }
+  getAccessToken() { return this.token; }
+
+  async connectWithToken(token: string): Promise<void> {
+    const value = token.trim();
+    if (!value) throw new Error('Enter a GitHub personal access token.');
+    const previous = this.token;
+    this.token = value;
+    try {
+      await this.getUser();
+    } catch {
+      this.token = previous;
+      throw new Error('GitHub rejected this token. Check that it is active and has the repository permissions you need.');
+    }
+    try {
+      await this.setToken(value);
+    } catch (error) {
+      this.token = previous;
+      throw new Error(error instanceof Error
+        ? `Token is valid, but this browser could not securely store it: ${error.message}`
+        : 'Token is valid, but this browser could not securely store it.', { cause: error });
+    }
+  }
 
   private headers(): HeadersInit {
     const h: Record<string, string> = {
@@ -76,8 +130,8 @@ class GitHubAPI {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code }),
       });
-      const data = await res.json();
-      if (data.access_token) { this.setToken(data.access_token); return true; }
+      const data = await res.json() as { access_token?: string };
+      if (res.ok && data.access_token) { await this.setToken(data.access_token); return true; }
     } catch {}
     return false;
   }
@@ -133,9 +187,18 @@ class GitHubAPI {
   }
 
   parseRemoteUrl(url: string): GHRepo | null {
-    const m = url.match(/github\.com[:/]([^/]+)\/([^/.]+)/);
-    if (!m) return null;
-    return { owner: m[1], repo: m[2].replace(/\.git$/, '') };
+    const ssh = url.trim().match(/^git@github\.com:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?$/i);
+    if (ssh) return { owner: ssh[1], repo: ssh[2] };
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'https:' || parsed.hostname.toLowerCase() !== 'github.com'
+        || parsed.username || parsed.password || parsed.search || parsed.hash) return null;
+      const parts = parsed.pathname.split('/').filter(Boolean);
+      if (parts.length !== 2 || !/^[A-Za-z0-9_.-]+$/.test(parts[0]) || !/^[A-Za-z0-9_.-]+(?:\.git)?$/.test(parts[1])) return null;
+      return { owner: parts[0], repo: parts[1].replace(/\.git$/i, '') };
+    } catch {
+      return null;
+    }
   }
 }
 
