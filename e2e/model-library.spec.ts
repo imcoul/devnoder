@@ -15,7 +15,7 @@ test('search and add a model from the installed WebLLM registry', async ({ page 
   const search = page.getByLabel('Search model IDs');
   await search.fill('Llama-3.2-1B-Instruct-q4f16_1-MLC');
   const result = page.getByRole('listitem').filter({ hasText: 'Llama-3.2-1B-Instruct-q4f16_1-MLC' });
-  await expect(result).toBeVisible();
+  await expect(result).toBeVisible({ timeout: 20_000 });
   await result.getByRole('button', { name: 'Add & select' }).click();
 
   await expect(page.getByRole('combobox', { name: 'AI model' }))

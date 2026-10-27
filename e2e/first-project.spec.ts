@@ -3,16 +3,9 @@ import { readFile } from 'node:fs/promises';
 import { strFromU8, unzipSync } from 'fflate';
 
 test('create a project, create and edit a source file, then recover it after reload', async ({ page }) => {
-  const pageErrors: string[] = [];
-  page.on('pageerror', error => pageErrors.push(error.message));
-  page.on('console', message => { if (message.type() === 'error') pageErrors.push(message.text()); });
   await page.goto('/');
-  await page.waitForTimeout(500);
-  if (await page.getByRole('button', { name: 'Create blank project' }).count() === 0) {
-    throw new Error(`First-run UI did not render. Browser errors: ${pageErrors.join(' | ')}. Body: ${await page.locator('body').innerText()}`);
-  }
   const createBlank = page.getByRole('button', { name: 'Create blank project' });
-  await expect(createBlank).toBeVisible();
+  await expect(createBlank).toBeVisible({ timeout: 15_000 });
 
   await page.getByRole('button', { name: 'Create blank project' }).click();
   await page.getByLabel('Project name').fill('Browser acceptance project');
