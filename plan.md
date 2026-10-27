@@ -8,7 +8,7 @@ Bring the existing DevNoder PWA toward the approved `DEVELOPMENT_PLAN.md` and `D
 
 The local `codex/repair-first-project` branch now passes a clean `npm ci`, production TypeScript/Vite build, 119 unit tests, two desktop/Android-profile Chromium acceptance tests, ESLint with zero errors, and `npm audit` with zero findings. The Pages output gzip-compresses and precaches the ONNX runtime (6.32 MiB); local Wrangler Pages emulation serves it with the expected gzip/WASM headers and byte-identical decoded content. Lint still reports 242 warnings and global line coverage is 22.01%.
 
-This is not a release checkpoint: Cloudflare has no `devnoder` Pages project, the public domain still serves “Hello world,” the executor is unconfigured, and direct arbitrary model-weight download/management, full project build/preview/export and remote Git flows are still incomplete. Track remaining acceptance in `TODO.md`; do not announce the product as ready or change public routing until the owner-approved release gates pass.
+This is not a release checkpoint: Cloudflare has no `devnoder` Pages project, `https://devnoder.srvel.net` still serves “Hello world,” and the executor is unconfigured. Direct arbitrary model-weight download/management, full project build/preview/export and remote Git flows are still incomplete. Four commits exist only in the local branch because GitHub rejected the push without the connector’s `workflows` permission; no PR or remote CI run exists. Track remaining acceptance in `TODO.md`; do not announce the product as ready or change public routing until the owner-approved release gates pass.
 
 ## Implementation approach
 
