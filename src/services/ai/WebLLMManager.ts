@@ -23,33 +23,50 @@ class WebLLMManager {
   async load(modelId: string): Promise<void> {
     if (this.currentModelId === modelId && (this.engine || this.tfPipeline)) return;
 
-    if ('gpu' in navigator) {
+    const { MODELS } = await import('./AIGateway');
+    const model = MODELS.find(candidate => candidate.id === modelId);
+    if (!model?.offlineCapable) throw new Error(`Unknown on-device model: ${modelId}`);
+
+    if (typeof navigator !== 'undefined' && 'gpu' in navigator && model.provider === 'webllm') {
       try {
         const { CreateMLCEngine } = await import('@mlc-ai/web-llm');
-        this.engine = await CreateMLCEngine(modelId, {
+        const engine = await CreateMLCEngine(modelId, {
           initProgressCallback: (info: any) => {
             this.emitProgress(Math.round((info.progress ?? 0) * 100), info.text ?? 'Loading…');
           },
         });
+        this.engine = engine;
+        this.tfPipeline = null;
         this.currentModelId = modelId;
         this.useTransformers = false;
         return;
       } catch (e) {
-        console.warn('WebLLM WebGPU failed, falling back to Transformers.js', e);
+        this.engine = null;
+        if (!model.transformersModelId) {
+          const reason = e instanceof Error ? ` (${e.message})` : '';
+          throw new Error(`${model.label} could not load with WebGPU${reason}. Try Qwen 0.5B (local), the supported WASM model.`, { cause: e });
+        }
       }
     }
 
-    // Transformers.js WASM fallback
+    // Only use a fallback whose exact model repository is declared by the
+    // selected catalog entry. Never run a different model under its label.
+    if (!model.transformersModelId) {
+      throw new Error(`${model.label} requires a compatible WebGPU device. Choose Qwen 0.5B (local) for the supported WASM fallback.`);
+    }
+
     this.useTransformers = true;
+    this.engine = null;
     this.emitProgress(10, 'Loading Transformers.js…');
     const { pipeline } = await import('@huggingface/transformers');
     this.emitProgress(30, 'Downloading model weights…');
-    this.tfPipeline = await pipeline('text-generation', 'Xenova/Qwen2.5-Coder-0.5B-Instruct', {
+    const loadedPipeline = await pipeline('text-generation', model.transformersModelId, {
       progress_callback: (info: any) => {
         if (info.status === 'progress')
           this.emitProgress(30 + Math.round(info.progress * 0.6), `Downloading ${info.file}…`);
       },
     });
+    this.tfPipeline = loadedPipeline;
     this.emitProgress(100, 'Ready');
     this.currentModelId = modelId;
   }
@@ -89,7 +106,8 @@ class WebLLMManager {
     if (this.useTransformers && this.tfPipeline) {
       const prompt = augmented.map(m => `${m.role}: ${m.content}`).join('\n') + '\nassistant:';
       const result = await this.tfPipeline(prompt, { max_new_tokens: 512 });
-      const text   = (result[0]?.generated_text ?? '').split('assistant:').pop()?.trim() ?? '';
+      const generated = result[0]?.generated_text ?? '';
+      const text = (generated.startsWith(prompt) ? generated.slice(prompt.length) : generated).trim();
 
       const toolCall = this.parseToolCall(text);
       if (toolCall && tools.length) {
@@ -153,46 +171,7 @@ class WebLLMManager {
   }
 
   isLoaded() { return !!(this.engine || this.tfPipeline); }
-  unload()   { this.engine = null; this.tfPipeline = null; this.currentModelId = ''; }
-
-  /** Sprint 15 — register a custom fine-tuned model from HuggingFace URL */
-  async addCustomModel(url: string, label: string): Promise<void> {
-    const { MODELS } = await import('./AIGateway');
-    const id = `custom-${Date.now()}`;
-    (MODELS as any).push({
-      id, label: `${label} (Custom)`, provider: 'webllm',
-      contextWindow: 32768, free: true, offlineCapable: true, supportsTools: true,
-    });
-    // Persist
-    const stored = JSON.parse(localStorage.getItem('devnoder-custom-models') ?? '[]');
-    stored.push({ id, url, label });
-    localStorage.setItem('devnoder-custom-models', JSON.stringify(stored));
-    // Pre-register with WebLLM engine registry
-    try {
-      const { prebuiltAppConfig } = await import('@mlc-ai/web-llm');
-      if (prebuiltAppConfig?.model_list) {
-        prebuiltAppConfig.model_list.push({
-          model: url, model_id: id, model_lib: url.replace('.gguf', '-ctx4k_cs1k-webgpu.wasm'),
-        });
-      }
-    } catch { /* webllm not loaded yet */ }
-  }
-
-  loadCustomModels(): void {
-    try {
-      const stored = JSON.parse(localStorage.getItem('devnoder-custom-models') ?? '[]');
-      for (const m of stored) {
-        import('./AIGateway').then(({ MODELS }) => {
-          if (!(MODELS as any).find((x: any) => x.id === m.id)) {
-            (MODELS as any).push({
-              id: m.id, label: `${m.label} (Custom)`, provider: 'webllm',
-              contextWindow: 32768, free: true, offlineCapable: true, supportsTools: true,
-            });
-          }
-        });
-      }
-    } catch { /* ignore */ }
-  }
+  unload()   { this.engine = null; this.tfPipeline = null; this.currentModelId = ''; this.useTransformers = false; }
 }
 
 export const webLLMManager = new WebLLMManager();

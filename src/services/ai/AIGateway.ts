@@ -2,17 +2,19 @@
 import { mcpClient } from './MCPClient';
 import { cryptoVault } from '../security/CryptoVault';
 
-export type Provider = 'webllm' | 'groq' | 'openai' | 'anthropic' | 'openrouter' | 'litellm';
+export type Provider = 'webllm' | 'groq' | 'openai' | 'anthropic' | 'openrouter' | 'litellm' | 'openai-compatible';
 
 export interface ModelConfig {
   id: string; label: string; provider: Provider;
   contextWindow: number; free: boolean; offlineCapable: boolean;
   supportsTools?: boolean;
+  /** Exact Hugging Face model used when this selection has a supported WASM path. */
+  transformersModelId?: string;
 }
 
 export const MODELS: ModelConfig[] = [
-  { id: 'Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC', label: 'Qwen 1.5B (local)',      provider: 'webllm',    contextWindow: 32768,  free: true,  offlineCapable: true,  supportsTools: true  },
-  { id: 'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC', label: 'Qwen 0.5B (local)',      provider: 'webllm',    contextWindow: 32768,  free: true,  offlineCapable: true,  supportsTools: true  },
+  { id: 'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC', label: 'Qwen 0.5B (local)',      provider: 'webllm',    contextWindow: 32768,  free: true,  offlineCapable: true,  supportsTools: true, transformersModelId: 'Xenova/Qwen2.5-Coder-0.5B-Instruct' },
+  { id: 'Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC', label: 'Qwen 1.5B (WebGPU)',     provider: 'webllm',    contextWindow: 32768,  free: true,  offlineCapable: true,  supportsTools: true  },
   { id: 'Phi-3.5-mini-instruct-q4f16_1-MLC',        label: 'Phi 3.5 Mini (local)',   provider: 'webllm',    contextWindow: 128000, free: true,  offlineCapable: true,  supportsTools: false },
   { id: 'llama-3.1-8b-instant',                     label: 'Llama 3.1 8B (Groq)',    provider: 'groq',      contextWindow: 131072, free: true,  offlineCapable: false, supportsTools: true  },
   { id: 'llama-3.3-70b-versatile',                  label: 'Llama 3.3 70B (Groq)',   provider: 'groq',      contextWindow: 131072, free: true,  offlineCapable: false, supportsTools: true  },
@@ -33,12 +35,144 @@ export interface ToolCallEvent { id: string; name: string; args: Record<string, 
 
 type StreamHandler = (chunk: StreamChunk) => void;
 
+export interface OpenAICompatibleSettings {
+  baseUrl: string;
+  model: string;
+  label: string;
+  hasApiKey: boolean;
+}
+
+interface CustomEndpoint {
+  baseUrl: string;
+  endpointUrl: string;
+  model: string;
+  label: string;
+}
+
+const CUSTOM_ENDPOINT_KEY = 'devnoder-openai-compatible-endpoint';
+
+function validateEndpointUrl(value: string): { baseUrl: string; endpointUrl: string } {
+  let url: URL;
+  try { url = new URL(value.trim()); } catch { throw new Error('Enter a valid HTTPS endpoint URL.'); }
+  const isLoopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLoopback)) {
+    throw new Error('Use HTTPS for a remote model server. Plain HTTP is allowed only for localhost.');
+  }
+  if (url.username || url.password || url.search || url.hash) {
+    throw new Error('Do not put credentials, query parameters, or fragments in the endpoint URL.');
+  }
+  let path = url.pathname.replace(/\/+$/, '');
+  if (!path || path === '/') path = '/v1';
+  const endpointPath = path.endsWith('/chat/completions') ? path : `${path}/chat/completions`;
+  return { baseUrl: `${url.origin}${path}`, endpointUrl: `${url.origin}${endpointPath}` };
+}
+
+async function* readSSEData(body: ReadableStream<Uint8Array> | null): AsyncGenerator<string> {
+  if (!body) throw new Error('The model server returned no streaming response body.');
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  const dataLines: string[] = [];
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      buffer += decoder.decode(value, { stream: !done });
+      let newline = buffer.indexOf('\n');
+      while (newline !== -1) {
+        let line = buffer.slice(0, newline);
+        buffer = buffer.slice(newline + 1);
+        if (line.endsWith('\r')) line = line.slice(0, -1);
+        if (!line) {
+          if (dataLines.length) yield dataLines.splice(0).join('\n');
+        } else if (!line.startsWith(':') && line.startsWith('data:')) {
+          dataLines.push(line.slice(5).replace(/^ /, ''));
+        }
+        newline = buffer.indexOf('\n');
+      }
+      if (done) break;
+    }
+
+    if (buffer) {
+      const line = buffer.endsWith('\r') ? buffer.slice(0, -1) : buffer;
+      if (line.startsWith('data:')) dataLines.push(line.slice(5).replace(/^ /, ''));
+    }
+    if (dataLines.length) yield dataLines.join('\n');
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 class AIGateway {
   private modelId = MODELS[0].id;
   private keys: Partial<Record<Provider, string>> = {};
+  private customEndpoint: CustomEndpoint | null = null;
 
-  setModel(id: string)                             { this.modelId = id; }
-  getModel()                                       { return MODELS.find(m => m.id === this.modelId) ?? MODELS[0]; }
+  setModel(id: string) {
+    this.modelId = this.getModels().some(model => model.id === id) ? id : MODELS[0].id;
+  }
+  getModels(): ModelConfig[] {
+    const models = [...MODELS];
+    if (this.customEndpoint) models.push({
+      id: 'custom-openai-compatible',
+      label: `${this.customEndpoint.label} · ${this.customEndpoint.model}`,
+      provider: 'openai-compatible', contextWindow: 32768, free: false,
+      offlineCapable: false, supportsTools: false,
+    });
+    return models;
+  }
+  getModel() { return this.getModels().find(m => m.id === this.modelId) ?? MODELS[0]; }
+
+  getCustomEndpointSettings(): OpenAICompatibleSettings | null {
+    if (!this.customEndpoint) return null;
+    return {
+      baseUrl: this.customEndpoint.baseUrl,
+      model: this.customEndpoint.model,
+      label: this.customEndpoint.label,
+      hasApiKey: !!this.keys['openai-compatible'],
+    };
+  }
+
+  async configureCustomEndpoint(input: {
+    baseUrl: string; model: string; label?: string; apiKey?: string;
+  }): Promise<void> {
+    const model = input.model.trim();
+    if (!model) throw new Error('Enter the exact model identifier served by your endpoint.');
+    const { baseUrl, endpointUrl } = validateEndpointUrl(input.baseUrl);
+    this.customEndpoint = {
+      baseUrl,
+      endpointUrl,
+      model,
+      label: input.label?.trim() || 'Custom endpoint',
+    };
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(CUSTOM_ENDPOINT_KEY, JSON.stringify({
+        baseUrl: this.customEndpoint.baseUrl,
+        model: this.customEndpoint.model,
+        label: this.customEndpoint.label,
+      }));
+    }
+
+    const apiKey = input.apiKey?.trim();
+    if (apiKey && !apiKey.startsWith('•')) {
+      this.keys['openai-compatible'] = apiKey;
+      const encrypted = await cryptoVault.encrypt(apiKey);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('devnoder-key-openai-compatible', encrypted);
+      }
+    }
+  }
+
+  removeCustomEndpoint(): void {
+    this.customEndpoint = null;
+    delete this.keys['openai-compatible'];
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(CUSTOM_ENDPOINT_KEY);
+      localStorage.removeItem('devnoder-key-openai-compatible');
+    }
+    if (this.modelId === 'custom-openai-compatible') this.modelId = MODELS[0].id;
+  }
+
   setKey(provider: Provider, key: string) {
     this.keys[provider] = key; // kept in memory for the hot request path
     cryptoVault.encrypt(key)
@@ -47,11 +181,27 @@ class AIGateway {
   }
 
   async loadKeys(): Promise<void> {
-    for (const p of ['groq', 'openai', 'anthropic', 'openrouter'] as Provider[]) {
+    if (typeof localStorage === 'undefined') return;
+    for (const p of ['groq', 'openai', 'anthropic', 'openrouter', 'openai-compatible'] as Provider[]) {
       const stored = localStorage.getItem(`devnoder-key-${p}`);
       if (!stored) continue;
       const decrypted = await cryptoVault.decrypt(stored);
       if (decrypted) this.keys[p] = decrypted;
+    }
+    try {
+      const stored = localStorage.getItem(CUSTOM_ENDPOINT_KEY);
+      if (!stored) return;
+      const config = JSON.parse(stored) as { baseUrl?: string; model?: string; label?: string };
+      if (!config.baseUrl || !config.model) return;
+      const checked = validateEndpointUrl(config.baseUrl);
+      this.customEndpoint = {
+        ...checked,
+        model: config.model,
+        label: config.label?.trim() || 'Custom endpoint',
+      };
+    } catch (error) {
+      localStorage.removeItem(CUSTOM_ENDPOINT_KEY);
+      console.warn('Stored custom model endpoint is invalid and was ignored:', error);
     }
   }
 
@@ -70,6 +220,16 @@ class AIGateway {
       case 'groq':       return this._streamOpenAI('https://api.groq.com/openai/v1/chat/completions', this.keys.groq ?? '',   messages, onChunk, signal, tools);
       case 'openrouter': return this._streamOpenAI('https://openrouter.ai/api/v1/chat/completions', this.keys.openrouter ?? '', messages, onChunk, signal, []);
       case 'litellm':    return this._streamLiteLLM(messages, onChunk, signal, tools);
+      case 'openai-compatible':
+        if (!this.customEndpoint) {
+          onChunk({ delta: 'Configure a trusted OpenAI-compatible endpoint in AI settings first.', done: true });
+          return;
+        }
+        return this._streamOpenAI(
+          this.customEndpoint.endpointUrl,
+          this.keys['openai-compatible'] ?? '',
+          messages, onChunk, signal, [], this.customEndpoint.model, true,
+        );
       default:           onChunk({ delta: 'No API key configured.', done: true });
     }
   }
@@ -77,7 +237,7 @@ class AIGateway {
   private fallbackModelIds: string[] = [];
 
   setFallbackModelIds(ids: string[]) {
-    this.fallbackModelIds = ids.filter(id => MODELS.some(m => m.id === id));
+    this.fallbackModelIds = ids.filter(id => this.getModels().some(m => m.id === id));
   }
 
   async streamWithFallback(messages: Message[], onChunk: StreamHandler, signal?: AbortSignal): Promise<void> {
@@ -138,17 +298,13 @@ class AIGateway {
         });
         if (!res.ok) { onChunk({ delta: `Anthropic error ${res.status}`, done: true }); return; }
 
-        const reader = res.body!.getReader();
-        const dec    = new TextDecoder();
         let   toolUseBlock: any = null;
         let   toolInputRaw = '';
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          for (const line of dec.decode(value).split('\n').filter(l => l.startsWith('data: '))) {
-            try {
-              const j = JSON.parse(line.slice(6));
+        for await (const data of readSSEData(res.body)) {
+          if (!data || data === '[DONE]') continue;
+          try {
+              const j = JSON.parse(data);
               if (j.type === 'content_block_start' && j.content_block?.type === 'tool_use') {
                 toolUseBlock = j.content_block;
                 toolInputRaw = '';
@@ -180,16 +336,15 @@ class AIGateway {
                 toolUseBlock = null;
               }
               if (j.type === 'message_stop') { onChunk({ delta: '', done: true }); }
-            } catch { /* skip */ }
-          }
+          } catch { /* skip malformed/unknown provider events */ }
         }
       } catch (e: any) { if (e.name !== 'AbortError') onChunk({ delta: `Error: ${e.message}`, done: true }); }
     }
   }
 
   // ── OpenAI/Groq — tool loop ────────────────────────────────────────────────
-  private async _streamOpenAI(url: string, key: string, messages: Message[], onChunk: StreamHandler, signal?: AbortSignal, tools: any[] = []) {
-    if (!key) { onChunk({ delta: 'API key not set. Add it in Settings.', done: true }); return; }
+  private async _streamOpenAI(url: string, key: string, messages: Message[], onChunk: StreamHandler, signal?: AbortSignal, tools: any[] = [], modelId = this.modelId, allowUnauthenticated = false) {
+    if (!key && !allowUnauthenticated) { onChunk({ delta: 'API key not set. Add it in Settings.', done: true }); return; }
     const openAITools = mcpClient.toOpenAITools(tools);
     let   history     = messages.filter(m => m.role !== 'tool');
     let   continueLoop = true;
@@ -197,25 +352,22 @@ class AIGateway {
     while (continueLoop) {
       continueLoop = false;
       try {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (key) headers.Authorization = `Bearer ${key}`;
         const res = await fetch(url, {
           method: 'POST', signal,
-          headers: { 'Content-Type':'application/json', Authorization: `Bearer ${key}`, 'HTTP-Referer':'https://devnoder.srvel.io' },
+          headers,
           body: JSON.stringify({
-            model: this.modelId, messages: history, stream: true, max_tokens: 4096,
+            model: modelId, messages: history, stream: true, max_tokens: 4096,
             ...(openAITools.length && { tools: openAITools, tool_choice: 'auto' }),
           }),
         });
         if (!res.ok) { onChunk({ delta: `API error ${res.status}`, done: true }); return; }
 
-        const reader = res.body!.getReader();
-        const dec    = new TextDecoder();
         let   pendingToolCalls: Record<string, { id: string; name: string; argsRaw: string }> = {};
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          for (const line of dec.decode(value).split('\n').filter(l => l.startsWith('data: '))) {
-            const data = line.slice(6);
+        for await (const data of readSSEData(res.body)) {
+          if (!data) continue;
             if (data === '[DONE]') {
               // Process any pending tool calls
               if (Object.keys(pendingToolCalls).length) {
@@ -256,8 +408,7 @@ class AIGateway {
                   if (tc.function?.arguments) pendingToolCalls[idx].argsRaw += tc.function.arguments;
                 }
               }
-            } catch { /* skip */ }
-          }
+            } catch { /* skip malformed/unknown provider events */ }
         }
       } catch (e: any) { if (e.name !== 'AbortError') onChunk({ delta: `Error: ${e.message}`, done: true }); }
     }
@@ -285,15 +436,10 @@ class AIGateway {
         });
         if (!res.ok) { onChunk({ delta: `LiteLLM error ${res.status}`, done: true }); return; }
 
-        const reader = res.body!.getReader();
-        const dec = new TextDecoder();
         let pendingToolCalls: Record<string, { id: string; name: string; argsRaw: string }> = {};
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          for (const line of dec.decode(value).split('\n').filter(l => l.startsWith('data: '))) {
-            const data = line.slice(6);
+        for await (const data of readSSEData(res.body)) {
+          if (!data) continue;
             if (data === '[DONE]') {
               if (Object.keys(pendingToolCalls).length) {
                 for (const tc of Object.values(pendingToolCalls)) {
@@ -333,8 +479,7 @@ class AIGateway {
                   if (tc.function?.arguments) pendingToolCalls[idx].argsRaw += tc.function.arguments;
                 }
               }
-            } catch { /* skip */ }
-          }
+            } catch { /* skip malformed/unknown provider events */ }
         }
       } catch (e: any) { if (e.name !== 'AbortError') onChunk({ delta: `Error: ${e.message}`, done: true }); }
     }

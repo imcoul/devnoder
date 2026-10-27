@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { aiGateway, MODELS, type Message, type ToolCallEvent } from '../../services/ai/AIGateway';
+import { aiGateway, MODELS, type Message, type ModelConfig, type ToolCallEvent } from '../../services/ai/AIGateway';
 import { AGENTS, AgentId, agentRunner } from '../../services/ai/AIAgents';
 import { parseMessage, BoltAction } from '../../services/ai/StreamingMessageParser';
 import { webLLMManager } from '../../services/ai/WebLLMManager';
@@ -23,12 +23,24 @@ interface ChatMessage {
 
 function ActionBlock({ action }: { action: BoltAction }) {
   const [applied, setApplied] = useState(false);
+  const [applying, setApplying] = useState(false);
   const apply = async () => {
-    if (action.type === 'file' && action.filePath) {
+    if (action.type !== 'file' || !action.filePath || applying || applied) return;
+    const openBuffer = $buffers.get().find(buffer => buffer.path === action.filePath);
+    if (openBuffer?.dirty && !window.confirm(`Replace unsaved edits in ${action.filePath}?`)) return;
+    setApplying(true);
+    try {
+      if (openBuffer && (openBuffer.dirty || openBuffer.saving)) {
+        await bufferManager.save(openBuffer.id);
+      }
       await writeFile(action.filePath, action.content);
-      bufferManager.open(action.filePath, action.content);
+      bufferManager.replaceSaved(action.filePath, action.content);
       setApplied(true);
       showToast({ type: 'success', message: `Applied ${action.filePath}` });
+    } catch (error) {
+      showToast({ type: 'error', message: error instanceof Error ? error.message : 'File change could not be applied' });
+    } finally {
+      setApplying(false);
     }
   };
   return (
@@ -37,8 +49,8 @@ function ActionBlock({ action }: { action: BoltAction }) {
         <span className="action-type">{action.type === 'file' ? '📄' : '⌨'}</span>
         <span className="action-path">{action.filePath ?? 'shell'}</span>
         {action.type === 'file' && (
-          <button className="action-apply" onClick={apply} disabled={applied}>
-            {applied ? '✓ Applied' : 'Apply'}
+          <button className="action-apply" onClick={apply} disabled={applied || applying}>
+            {applied ? '✓ Applied' : applying ? 'Applying…' : 'Apply'}
           </button>
         )}
       </div>
@@ -130,11 +142,16 @@ export default function AIPanel() {
   const [messages, setMessages]     = useState<ChatMessage[]>([]);
   const [input, setInput]           = useState('');
   const [agentId, setAgentId]       = useState<AgentId>('code');
-  const [modelId, setModelId]       = useState(MODELS[0].id);
+  const [modelId, setModelId]       = useState(() => localStorage.getItem('devnoder-selected-model') ?? MODELS[0].id);
+  const [modelCatalog, setModelCatalog] = useState<ModelConfig[]>(MODELS);
   const [streaming, setStreaming]   = useState(false);
   const [loadProgress, setLoadProgress] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [keys, setKeys]             = useState({ groq: '', openai: '', anthropic: '', openrouter: '' });
+  const [customEndpointConfigured, setCustomEndpointConfigured] = useState(false);
+  const [customEndpointForm, setCustomEndpointForm] = useState({
+    label: 'Custom model server', baseUrl: '', model: '', apiKey: '',
+  });
   const bottomRef  = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -143,21 +160,34 @@ export default function AIPanel() {
   const activeBuffer = buffers.find(b => b.id === activeId);
 
   useEffect(() => {
-    aiGateway.loadKeys();
-    webLLMManager.loadCustomModels();
+    void aiGateway.loadKeys().then(() => {
+      const catalog = aiGateway.getModels();
+      setModelCatalog(catalog);
+      const savedModel = localStorage.getItem('devnoder-selected-model') ?? MODELS[0].id;
+      const activeModel = catalog.some(model => model.id === savedModel) ? savedModel : MODELS[0].id;
+      setModelId(activeModel);
+      aiGateway.setModel(activeModel);
+      const saved = aiGateway.getCustomEndpointSettings();
+      if (saved) {
+        setCustomEndpointConfigured(true);
+        setCustomEndpointForm({
+          label: saved.label,
+          baseUrl: saved.baseUrl,
+          model: saved.model,
+          apiKey: saved.hasApiKey ? '••••••••' : '',
+        });
+      }
+    }).catch(error => showToast({
+      type: 'error', message: error instanceof Error ? error.message : 'AI settings could not be loaded',
+    }));
     webLLMManager.onProgress((p, label) => setLoadProgress(p < 100 ? `${label} (${p}%)` : null));
   }, []);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
-  useEffect(() => { aiGateway.setModel(modelId); }, [modelId]);
-
-  // Sprint 15 — auto-select custom fine-tuned model when preference is set
   useEffect(() => {
-    const preferred = localStorage.getItem('devnoder-preferred-code-model');
-    if (preferred && MODELS.find(m => m.id === preferred)) {
-      setModelId(preferred);
-    }
-  }, []);
+    aiGateway.setModel(modelId);
+    localStorage.setItem('devnoder-selected-model', modelId);
+  }, [modelId]);
 
   const send = useCallback(async () => {
     const text = input.trim();
@@ -178,44 +208,52 @@ export default function AIPanel() {
     let fullResponse = '';
 
     const activeToolCalls = new Map<string, ToolCallEvent>();
-    await agentRunner.run(agentId, text, history, chunk => {
-      if (typeof chunk === 'string') {
-        fullResponse += chunk;
-        setMessages(prev => prev.map(m =>
-          m.id === assistantId ? { ...m, content: m.content + chunk } : m
-        ));
-      } else if (chunk && typeof chunk === 'object' && 'toolCall' in chunk) {
-        const evt = (chunk as any).toolCall as ToolCallEvent;
-        activeToolCalls.set(evt.id, evt);
-        setMessages(prev => prev.map(m =>
-          m.id === assistantId
-            ? { ...m, toolCalls: Array.from(activeToolCalls.values()) }
-            : m
-        ));
-      }
-    });
-
-    // Save to FeedbackStore (no rating yet — user will rate later)
     try {
-      const fid = await feedbackStore.add({
-        timestamp: Date.now(),
-        agentId,
-        modelId,
-        messages: [...history, { role: 'user', content: text }],
-        response: fullResponse,
-        rating: 'good', // neutral default until user rates
-        language: activeBuffer?.language ?? '',
-        projectName: activeBuffer?.path?.split('/')[1] ?? 'unknown',
+      await agentRunner.run(agentId, text, history, chunk => {
+        if (typeof chunk === 'string') {
+          fullResponse += chunk;
+          setMessages(prev => prev.map(m =>
+            m.id === assistantId ? { ...m, content: m.content + chunk } : m
+          ));
+        } else if (chunk && typeof chunk === 'object' && 'toolCall' in chunk) {
+          const evt = (chunk as any).toolCall as ToolCallEvent;
+          activeToolCalls.set(evt.id, evt);
+          setMessages(prev => prev.map(m =>
+            m.id === assistantId
+              ? { ...m, toolCalls: Array.from(activeToolCalls.values()) }
+              : m
+          ));
+        }
       });
-      setMessages(prev => prev.map(m =>
-        m.id === assistantId ? { ...m, feedbackId: fid, rated: undefined } : m
-      ));
-    } catch { /* non-critical */ }
 
-    setStreaming(false);
-    import('../../services/accessibility/AudioCueService')
-      .then(m => m.audioCueService.cue('ai-done'))
-      .catch(() => {});
+      // Save to FeedbackStore (no rating yet — user will rate later)
+      try {
+        const fid = await feedbackStore.add({
+          timestamp: Date.now(),
+          agentId,
+          modelId,
+          messages: [...history, { role: 'user', content: text }],
+          response: fullResponse,
+          rating: 'good',
+          language: activeBuffer?.language ?? '',
+          projectName: activeBuffer?.path?.split('/')[1] ?? 'unknown',
+        });
+        setMessages(prev => prev.map(m =>
+          m.id === assistantId ? { ...m, feedbackId: fid, rated: undefined } : m
+        ));
+      } catch { /* feedback persistence is non-critical */ }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'The model request failed.';
+      setMessages(prev => prev.map(m =>
+        m.id === assistantId ? { ...m, content: `${m.content}${m.content ? '\n\n' : ''}Request failed: ${message}` } : m
+      ));
+      showToast({ type: 'error', message });
+    } finally {
+      setStreaming(false);
+      import('../../services/accessibility/AudioCueService')
+        .then(m => m.audioCueService.cue('ai-done'))
+        .catch(() => {});
+    }
   }, [input, streaming, agentId, modelId, messages, activeBuffer]);
 
   const handleRate = async (msgId: string, rating: 'good' | 'bad' | 'edited', edited?: string) => {
@@ -258,7 +296,30 @@ export default function AIPanel() {
     showToast({ type: 'success', message: 'API keys saved locally' });
   };
 
-  const selectedModel = MODELS.find(m => m.id === modelId) ?? MODELS[0];
+  const saveCustomEndpoint = async () => {
+    try {
+      await aiGateway.configureCustomEndpoint(customEndpointForm);
+      setModelCatalog(aiGateway.getModels());
+      setCustomEndpointConfigured(true);
+      setModelId('custom-openai-compatible');
+      const saved = aiGateway.getCustomEndpointSettings();
+      setCustomEndpointForm(form => ({ ...form, apiKey: saved?.hasApiKey ? '••••••••' : '' }));
+      showToast({ type: 'success', message: 'Custom endpoint saved. Its model is now in the picker.' });
+    } catch (error) {
+      showToast({ type: 'error', message: error instanceof Error ? error.message : 'Endpoint settings could not be saved' });
+    }
+  };
+
+  const removeCustomEndpoint = () => {
+    aiGateway.removeCustomEndpoint();
+    setModelCatalog(aiGateway.getModels());
+    setCustomEndpointConfigured(false);
+    setCustomEndpointForm({ label: 'Custom model server', baseUrl: '', model: '', apiKey: '' });
+    if (modelId === 'custom-openai-compatible') setModelId(MODELS[0].id);
+    showToast({ type: 'info', message: 'Custom endpoint removed from this browser.' });
+  };
+
+  const selectedModel = modelCatalog.find(m => m.id === modelId) ?? MODELS[0];
 
   return (
     <div className="ai-panel">
@@ -271,7 +332,7 @@ export default function AIPanel() {
           ))}
         </div>
         <select className="model-select" aria-label="AI model" value={modelId} onChange={e => setModelId(e.target.value)}>
-          {MODELS.map(m => (
+          {modelCatalog.map(m => (
             <option key={m.id} value={m.id}>
               {m.label}{m.free ? ' ★' : ''}{m.id.startsWith('custom-') ? ' 🎯' : ''}
             </option>
@@ -285,7 +346,11 @@ export default function AIPanel() {
       <div className="ai-agent-label">
         {AGENTS.find(a => a.id === agentId)?.icon} {AGENTS.find(a => a.id === agentId)?.label} Agent
         <span className="ai-model-badge">{selectedModel.label}</span>
-        {selectedModel.offlineCapable && <span className="ai-offline-badge">Offline</span>}
+        {selectedModel.offlineCapable && (
+          <span className="ai-offline-badge" title="On-device model. Its weights download on first use; offline use requires the browser to retain the cache.">
+            On-device · first use downloads
+          </span>
+        )}
       </div>
 
       <div className="ai-messages">
@@ -310,24 +375,10 @@ export default function AIPanel() {
           onChange={e => setInput(e.target.value)} onKeyDown={onKeyDown}
           placeholder={`Ask the ${AGENTS.find(a => a.id === agentId)?.label} agent…`}
           rows={3} />
-        {/* Auto-select preference — shown when a custom model is selected */}
-        {modelId.startsWith('custom-') && (
+        {modelId === 'custom-openai-compatible' && (
           <div className="ai-custom-model-bar">
-            <span className="ai-custom-badge">🎯 Custom model active</span>
-            <button className="ai-set-default-btn"
-              onClick={() => {
-                localStorage.setItem('devnoder-preferred-code-model', modelId);
-                showToast({ type: 'success', message: 'Set as default model for code panels' });
-              }}>
-              Set as default
-            </button>
-            <button className="ai-clear-default-btn"
-              onClick={() => {
-                localStorage.removeItem('devnoder-preferred-code-model');
-                showToast({ type: 'info', message: 'Default model preference cleared' });
-              }}>
-              Clear default
-            </button>
+            <span className="ai-custom-badge">Custom endpoint active</span>
+            <span>Your prompts and code go directly to that server.</span>
           </div>
         )}
         <div className="ai-input-actions">
@@ -361,6 +412,41 @@ export default function AIPanel() {
             ))}
             <button className="ai-send-btn" onClick={saveKeys}>Save Keys</button>
             <p className="ai-key-note">Keys stored locally — never sent to Srvel or anywhere except your chosen provider.</p>
+
+            <section style={{ borderTop: '1px solid var(--color-border)', marginTop: '1rem', paddingTop: '1rem' }}>
+              <h3 style={{ margin: '0 0 0.5rem' }}>Custom OpenAI-compatible model server</h3>
+              <div className="ai-key-row">
+                <label htmlFor="custom-model-label">Label</label>
+                <input id="custom-model-label" value={customEndpointForm.label}
+                  onChange={e => setCustomEndpointForm(form => ({ ...form, label: e.target.value }))}
+                  placeholder="My model server" />
+              </div>
+              <div className="ai-key-row">
+                <label htmlFor="custom-model-url">Base URL</label>
+                <input id="custom-model-url" type="url" value={customEndpointForm.baseUrl}
+                  onChange={e => setCustomEndpointForm(form => ({ ...form, baseUrl: e.target.value }))}
+                  placeholder="https://your-server.example/v1" autoComplete="url" />
+              </div>
+              <div className="ai-key-row">
+                <label htmlFor="custom-model-id">Exact model ID</label>
+                <input id="custom-model-id" value={customEndpointForm.model}
+                  onChange={e => setCustomEndpointForm(form => ({ ...form, model: e.target.value }))}
+                  placeholder="qwen2.5-coder:7b" />
+              </div>
+              <div className="ai-key-row">
+                <label htmlFor="custom-model-key">API key (optional)</label>
+                <input id="custom-model-key" type="password" value={customEndpointForm.apiKey}
+                  onChange={e => setCustomEndpointForm(form => ({ ...form, apiKey: e.target.value }))}
+                  placeholder="Optional; stored encrypted in this browser" autoComplete="new-password" />
+              </div>
+              <button className="ai-send-btn" onClick={saveCustomEndpoint}>Save custom endpoint</button>
+              {customEndpointConfigured && (
+                <button className="ai-clear-btn" onClick={removeCustomEndpoint}>Remove custom endpoint</button>
+              )}
+              <p className="ai-key-note">
+                Your prompt and code snippets go to this server. Use only a server you trust; remote URLs must use HTTPS and permit this app through CORS. This connects to a model your server already serves—it does not download weights into the browser.
+              </p>
+            </section>
           </div>
         </div>
       )}

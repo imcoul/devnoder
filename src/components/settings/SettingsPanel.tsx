@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '@nanostores/react';
 import { useTranslation } from 'react-i18next';
-import { $theme, $lang, $ui, ThemeId, Lang, showToast } from '../../stores/ui';
+import { $theme, $lang, $ui, ThemeId, Lang } from '../../stores/ui';
 import { subscriptionService, PLANS, Tier } from '../../services/revenue/SubscriptionService';
 import { audioCueService, CueConfig } from '../../services/accessibility/AudioCueService';
 import { aiGateway } from '../../services/ai/AIGateway';
@@ -38,9 +38,6 @@ export default function SettingsPanel() {
   const [licenseMsg, setLicenseMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [keys, setKeys]       = useState({ groq: '', openai: '', anthropic: '', openrouter: '' });
   const [saved, setSaved]     = useState(false);
-  const [customModelUrl, setCustomModelUrl] = useState('');
-  const [customModelLabel, setCustomModelLabel] = useState('');
-  const [addingModel, setAddingModel] = useState(false);
 
   useEffect(() => {
     subscriptionService.load();
@@ -77,22 +74,6 @@ export default function SettingsPanel() {
     if (value && !value.startsWith('•')) {
       aiGateway.setKey(provider as any, value);
     }
-  };
-
-  const addCustomModel = async () => {
-    if (!customModelUrl.trim() || !customModelLabel.trim()) {
-      showToast({ type: 'error', message: 'Both URL and label are required' });
-      return;
-    }
-    setAddingModel(true);
-    try {
-      const { webLLMManager } = await import('../../services/ai/WebLLMManager');
-      await webLLMManager.addCustomModel(customModelUrl.trim(), customModelLabel.trim());
-      setCustomModelUrl(''); setCustomModelLabel('');
-      showToast({ type: 'success', message: `Custom model "${customModelLabel}" added — select it in the AI panel` });
-    } catch (e: any) {
-      showToast({ type: 'error', message: e.message });
-    } finally { setAddingModel(false); }
   };
 
   const activateLicense = async () => {
