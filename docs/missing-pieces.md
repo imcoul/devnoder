@@ -17,24 +17,24 @@
 - Project files persist through create → edit → autosave → reload → reopen; the browser flow passed on desktop Chromium and Android-profile Chromium.
 - ZIP export flushes dirty buffers, preserves binary bytes, excludes `.git` and respects a 20,000-file/100 MiB cap. Production-browser tests inspected exported file contents.
 - A project preview assembles a bounded static snapshot with local CSS; its iframe uses a restrictive sandbox/CSP. External requests are blocked and module graphs, binary assets and multi-page links are not claimed to work.
-- The live model UI can search/select the pinned WebLLM catalog and register compatible public Hugging Face `owner/model` entries for Transformers.js ONNX text generation. Tests verified registration/UI, not a real weight download or generated response.
+- The live model UI can search/select the pinned WebLLM catalog and register compatible public Hugging Face `owner/model` entries for Transformers.js ONNX text generation. A separate isolated browser against production downloaded `onnx-community/tiny-random-gpt2-ONNX`, loaded it and generated text. Its weights are intentionally random and the output was nonsense: this proves one small download/runtime path, not useful model quality or code assistance. The [model card][4] documents its Transformers.js `text-generation` use.
 - GitHub origin/token UI was tested against mocked `api.github.com` responses. Fine-grained PAT storage is encrypted in the device-bound browser vault, but actual credentialed clone/push/pull and conflict behavior have not been exercised.
 
 ## Runtime and model boundaries
 
 JavaScript/Python/PHP file commands run through named local/WASM adapters. This is not a general OS shell, native toolchain, npm package manager, Node project build system or arbitrary framework runner. The preview only supports a static subset.
 
-“Any model” is not yet supported. Local use is limited to the pinned WebLLM registry or compatible public Transformers.js ONNX text-generation repositories. GGUF and arbitrary model formats are unsupported. We have not verified representative full-weight downloads/inference on physical devices, and WebGPU, browser storage eviction, offline behavior and cancellation vary by browser/device. A custom OpenAI-compatible endpoint talks to an already-running server; it does not download weights. Do not advertise model UI registration as proven model execution.
+“Any model” is not yet supported. Local use is limited to the pinned WebLLM registry or compatible public Transformers.js ONNX text-generation repositories. GGUF and arbitrary model formats are unsupported. The tiny random model smoke test does not prove a useful code model, larger-weight model, or inference on physical devices. WebGPU, browser storage eviction, offline behavior and cancellation vary by browser/device. A custom OpenAI-compatible endpoint talks to an already-running server; it does not download weights. Do not advertise model UI registration as broad model support.
 
 ## Build and checks
 
 A clean `npm ci` and production build passed before deployment. The 26.86 MB ONNX WASM file is gzipped to 6.32 MiB with a rewritten asset URL; Cloudflare Pages serves it decompressed to the browser using a scoped response header. The build generated 86 precache entries (17,614.55 KiB) and no individual asset exceeds 25 MiB.
 
-The unit suite passed **20 files / 135 tests** with **23.49% global line coverage**. ESLint exits 0 with **241 warnings**. The complete dependency audit reports **zero advisories**. Eight desktop/Android-profile production-browser tests passed against the live custom domain: first-project save/reload/ZIP, model catalog and HF registration, sandboxed project preview, and mocked GitHub-token persistence/disconnect. Android was emulated, and no model weights or real GitHub credentials were used. Four GitHub Actions checks passed on the feature code commit; re-run/confirm checks after the test-wait follow-up is pushed.
+The unit suite passed **20 files / 135 tests** with **23.49% global line coverage**. ESLint exits 0 with **241 warnings**. The complete dependency audit reports **zero advisories**. Eight desktop/Android-profile production-browser tests passed against the live custom domain: first-project save/reload/ZIP, model catalog/HF registration, sandboxed project preview, and mocked GitHub-token persistence/disconnect. A separate isolated browser successfully downloaded and ran the tiny random ONNX model above. Android was emulated and no real GitHub credentials were used. All five PR checks (push/PR unit and E2E plus Cloudflare Pages) passed on commit `6a345c0`; verify the current head before merging.
 
 ## Remaining work before broad daily-use readiness
 
-1. Verify actual download and inference for representative compatible models, including browser storage and WebGPU on physical target devices. Document supported ONNX/WebLLM formats and keep GGUF outside scope until a runtime exists.
+1. Test useful compatible models, including a coding model, on physical target devices. The tiny random-model test proves only that a small public ONNX repository can download and run. Document supported ONNX/WebLLM formats and keep GGUF outside scope until a runtime exists.
 2. Configure and security-test executor/collaboration or keep those capabilities disabled; validate origin allowlists, authentication, project isolation, quotas, timeouts and cancellation before enabling remote execution.
 3. Exercise real fine-grained-token Git clone/push/pull and conflict handling on an authorized test repository. Verify OAuth only if it will be offered.
 4. Decide when to merge PR #3 into `develop` and later `main`. The current public Pages deployment is intentionally built from the draft repair branch, not from `main`; keep a tested rollback path.
@@ -47,3 +47,5 @@ The unit suite passed **20 files / 135 tests** with **23.49% global line coverag
 [2] [Cloudflare content compression](https://developers.cloudflare.com/speed/optimization/content/compression/) — supported gzip encoding and WebAssembly content types.
 
 [3] [Cloudflare Pages limits](https://developers.cloudflare.com/pages/platform/limits/) — the per-file deployment cap used in the build check.
+
+[4] [Hugging Face tiny-random-gpt2 ONNX model card](https://huggingface.co/onnx-community/tiny-random-gpt2-ONNX) — documents the Transformers.js `text-generation` pipeline used in the isolated smoke test.
