@@ -59,11 +59,13 @@ describe('projectContext', () => {
   it('updateActiveBuffer switches active buffer', () => {
     const buffer = {
       id: 'buf-1',
+      projectId: 'proj-1',
       path: 'src/index.ts',
       filename: 'index.ts',
       content: 'console.log(1)',
       language: 'typescript',
       dirty: false,
+      saving: false,
       cursorLine: 1,
       cursorCol: 1,
       scrollTop: 0,

@@ -60,8 +60,8 @@ export const projectService = {
 
   /** Create a new project, optionally scaffolding it from a starter template. */
   async createProject(name: string, options: CreateProjectOptions = {}): Promise<ProjectRecord> {
+    await bufferManager.closeAllBuffers();
     const record = await makeProjectRecord(name);
-    bufferManager.closeAllBuffers();
     setActiveProject(record.id);
     await setSetting(LAST_ACTIVE_KEY, record.id);
     setProjectContext(createProjectContext(record));
@@ -85,7 +85,7 @@ export const projectService = {
   async openProject(id: string): Promise<void> {
     const record = await db.projects.get(id);
     if (!record) throw new Error(`Unknown project: ${id}`);
-    bufferManager.closeAllBuffers();
+    await bufferManager.closeAllBuffers();
     setActiveProject(id);
     await setSetting(LAST_ACTIVE_KEY, id);
     await db.projects.put({ ...record, updatedAt: Date.now() });
@@ -95,8 +95,8 @@ export const projectService = {
 
   /** Create a project by cloning an existing git repository into it. */
   async importProject(name: string, url: string, token?: string): Promise<ProjectRecord> {
+    await bufferManager.closeAllBuffers();
     const record = await makeProjectRecord(name, url);
-    bufferManager.closeAllBuffers();
     setActiveProject(record.id);
     await setSetting(LAST_ACTIVE_KEY, record.id);
     setProjectContext(createProjectContext(record));

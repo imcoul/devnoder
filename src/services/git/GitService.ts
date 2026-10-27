@@ -32,6 +32,28 @@ export function setActiveProject(id: string): void {
   $activeProjectId.set(id);
 }
 
+/** Accept only canonical project-relative paths. Backslashes are rejected to
+ * avoid platform-specific separator ambiguity and root traversal. */
+export function normalizeProjectPath(filepath: string): string {
+  if (typeof filepath !== 'string' || filepath.length === 0) {
+    throw new Error('A project-relative file path is required.');
+  }
+  if (filepath.startsWith('/') || filepath.includes('\\') || /^[A-Za-z]:/.test(filepath)) {
+    throw new Error('File paths must be relative to the active project.');
+  }
+  if ([...filepath].some(character => {
+    const code = character.charCodeAt(0);
+    return code < 0x20 || code === 0x7f;
+  })) {
+    throw new Error('File paths cannot contain control characters.');
+  }
+  const segments = filepath.split('/');
+  if (segments.some(segment => !segment || segment === '.' || segment === '..')) {
+    throw new Error('File paths cannot contain empty, dot, or parent-directory segments.');
+  }
+  return segments.join('/');
+}
+
 export interface FileStatus {
   path: string;
   status: 'modified' | 'added' | 'deleted' | 'unmodified' | 'untracked';
@@ -72,9 +94,9 @@ export async function getStatus(): Promise<FileStatus[]> {
     .filter(([, head, workdir, stage]) => !(head === 1 && workdir === 1 && stage === 1))
     .map(([path, head, workdir, stage]) => {
       let status: FileStatus['status'];
-      if (head === 0 && workdir === 2) status = 'untracked';
+      if (head === 0 && workdir === 2 && stage === 2) status = 'added';
+      else if (head === 0 && workdir === 2) status = 'untracked';
       else if (head === 1 && workdir === 2) status = 'modified';
-      else if (head === 0 && workdir === 2 && stage === 2) status = 'added';
       else if (head === 1 && workdir === 0) status = 'deleted';
       else status = 'unmodified';
       return { path: String(path), status, staged: stage === 2 || stage === 3 };
@@ -83,12 +105,12 @@ export async function getStatus(): Promise<FileStatus[]> {
 
 export async function stageFile(filepath: string): Promise<void> {
   const dir = getDir();
-  await git.add({ fs, dir, filepath });
+  await git.add({ fs, dir, filepath: normalizeProjectPath(filepath) });
 }
 
 export async function unstageFile(filepath: string): Promise<void> {
   const dir = getDir();
-  await git.resetIndex({ fs, dir, filepath });
+  await git.resetIndex({ fs, dir, filepath: normalizeProjectPath(filepath) });
 }
 
 export async function stageAll(): Promise<void> {
@@ -184,13 +206,13 @@ export async function addRemote(name: string, url: string): Promise<void> {
 
 export async function readFile(filepath: string): Promise<string> {
   const dir = getDir();
-  const raw = await fs.promises.readFile(`${dir}/${filepath}`, { encoding: 'utf8' });
+  const raw = await fs.promises.readFile(`${dir}/${normalizeProjectPath(filepath)}`, { encoding: 'utf8' });
   return typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
 }
 
 export async function writeFile(filepath: string, content: string): Promise<void> {
   const dir = getDir();
-  const full = `${dir}/${filepath}`;
+  const full = `${dir}/${normalizeProjectPath(filepath)}`;
   const parts = full.split('/');
   for (let i = 2; i < parts.length; i++) {
     const d = parts.slice(0, i).join('/');
@@ -201,7 +223,7 @@ export async function writeFile(filepath: string, content: string): Promise<void
 
 export async function listFiles(subdir = ''): Promise<string[]> {
   const dir = getDir();
-  const base = subdir ? `${dir}/${subdir}` : dir;
+  const base = subdir ? `${dir}/${normalizeProjectPath(subdir)}` : dir;
   const recurse = async (p: string): Promise<string[]> => {
     const entries = await fs.promises.readdir(p);
     const results: string[] = [];

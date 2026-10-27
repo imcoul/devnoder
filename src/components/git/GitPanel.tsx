@@ -1,18 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useStore } from '@nanostores/react';
 import {
   initRepo, getStatus, stageFile, unstageFile, stageAll,
   commit, getLog, getBranches, createBranch, checkoutBranch,
+  listFiles, writeFile, normalizeProjectPath,
   FileStatus, CommitEntry, Branch,
 } from '../../services/git/GitService';
 import { gitHubAPI, PullRequest, Issue, CIRun } from '../../services/git/GitHubAPI';
 import { syncQueue, QueuedPush } from '../../services/git/SyncQueue';
 import { generateCommitMessage } from '../../services/git/CommitMessageAI';
-import { bufferManager } from '../../services/editor/BufferManager';
+import { $buffers, bufferManager } from '../../services/editor/BufferManager';
 import { diffTracker } from '../../services/ai/DiffTracker';
 import DiffViewer from '../editor/DiffViewer';
 import './GitPanel.css';
 
-type Tab = 'changes' | 'diff' | 'log' | 'branches' | 'prs' | 'issues' | 'ci';
+type Tab = 'files' | 'changes' | 'diff' | 'log' | 'branches' | 'prs' | 'issues' | 'ci';
 
 function timeAgo(ts: number): string {
   const s = Math.floor((Date.now() - ts) / 1000);
@@ -23,8 +25,10 @@ function timeAgo(ts: number): string {
 }
 
 export default function GitPanel() {
+  const buffers = useStore($buffers);
   const [tab, setTab]               = useState<Tab>('changes');
   const [status, setStatus]         = useState<FileStatus[]>([]);
+  const [files, setFiles]           = useState<string[]>([]);
   const [log, setLog]               = useState<CommitEntry[]>([]);
   const [branches, setBranches]     = useState<Branch[]>([]);
   const [prs, setPRs]               = useState<PullRequest[]>([]);
@@ -33,6 +37,8 @@ export default function GitPanel() {
   const [queue, setQueue]           = useState<QueuedPush[]>([]);
   const [commitMsg, setCommitMsg]   = useState('');
   const [newBranch, setNewBranch]   = useState('');
+  const [newFilePath, setNewFilePath] = useState('');
+  const [creatingFile, setCreatingFile] = useState(false);
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -43,8 +49,8 @@ export default function GitPanel() {
   const refresh = useCallback(async () => {
     try {
       await initRepo();
-      const [s, l, b] = await Promise.all([getStatus(), getLog(), getBranches()]);
-      setStatus(s); setLog(l); setBranches(b);
+      const [s, l, b, f] = await Promise.all([getStatus(), getLog(), getBranches(), listFiles()]);
+      setStatus(s); setLog(l); setBranches(b); setFiles(f.sort((a, b) => a.localeCompare(b)));
     } catch (e: any) { setError(e.message); }
   }, []);
 
@@ -54,12 +60,38 @@ export default function GitPanel() {
     gitHubAPI.loadToken();
   }, [refresh]);
 
+  const persistedBufferKey = buffers
+    .filter(buffer => !buffer.dirty && !buffer.saving)
+    .map(buffer => `${buffer.projectId}:${buffer.path}:${buffer.content}`)
+    .join('\u001e');
+
+  useEffect(() => {
+    if (!persistedBufferKey) return;
+    const timer = setTimeout(() => { void refresh(); }, 150);
+    return () => clearTimeout(timer);
+  }, [persistedBufferKey, refresh]);
+
   const openFile = async (path: string) => {
     try {
       const { readFile } = await import('../../services/git/GitService');
       const content = await readFile(path);
       bufferManager.open(path, content);
-    } catch {}
+    } catch (e: any) { setError(e.message); }
+  };
+
+  const createFile = async (event: React.FormEvent) => {
+    event.preventDefault();
+    try {
+      const path = normalizeProjectPath(newFilePath.trim());
+      if (files.includes(path)) throw new Error(`A file already exists at ${path}.`);
+      await writeFile(path, '');
+      bufferManager.open(path, '');
+      setNewFilePath('');
+      setCreatingFile(false);
+      await refresh();
+    } catch (e: any) {
+      setError(e.message);
+    }
   };
 
   const stage = async (path: string) => { await stageFile(path); refresh(); };
@@ -117,9 +149,10 @@ export default function GitPanel() {
     <div className="git-panel">
       {/* Tab bar */}
       <div className="git-tabs" role="tablist" aria-label="Git">
-        {(['changes','diff','log','branches','prs','issues','ci'] as Tab[]).map(t => (
+        {(['files','changes','diff','log','branches','prs','issues','ci'] as Tab[]).map(t => (
           <button key={t} className={`git-tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}
             role="tab" aria-selected={tab === t}>
+            {t === 'files'    && `Files${files.length ? ` (${files.length})` : ''}`}
             {t === 'changes'  && `Changes ${status.filter(f=>f.status!=='unmodified').length ? `(${status.filter(f=>f.status!=='unmodified').length})` : ''}`}
             {t === 'diff'     && `Diff${diffPath ? ` (${diffPath.split('/').pop()})` : ''}`}
             {t === 'log'      && 'Log'}
@@ -132,6 +165,38 @@ export default function GitPanel() {
       </div>
 
       {error && <div className="git-error" onClick={() => setError(null)}>{error} ×</div>}
+
+      {/* ── Project files ── */}
+      {tab === 'files' && (
+        <div className="git-body">
+          <div className="git-section-head">
+            <span>Project files</span>
+            <button className="git-link" onClick={() => setCreatingFile(value => !value)}>
+              {creatingFile ? 'Cancel' : '+ New file'}
+            </button>
+          </div>
+          {creatingFile && (
+            <form className="git-new-branch" onSubmit={createFile}>
+              <input className="git-branch-input" autoFocus value={newFilePath}
+                onChange={e => setNewFilePath(e.target.value)}
+                aria-label="Project-relative file path" placeholder="src/main.ts" />
+              <button className="git-commit-btn" type="submit" disabled={!newFilePath.trim()}>Create</button>
+            </form>
+          )}
+          {files.map(path => (
+            <button key={path} type="button" className="git-file-row" onClick={() => openFile(path)}>
+              <span className="git-file-status" aria-hidden="true">{path.includes('/') ? '↳' : '·'}</span>
+              <span className="git-file-path">{path}</span>
+            </button>
+          ))}
+          {files.length === 0 && !creatingFile && (
+            <div className="git-empty">
+              <p>This project has no files yet.</p>
+              <button className="git-link" onClick={() => setCreatingFile(true)}>Create the first file</button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Changes ── */}
       {tab === 'changes' && (
