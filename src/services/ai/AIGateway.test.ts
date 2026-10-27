@@ -4,8 +4,15 @@ const vault = vi.hoisted(() => ({
   encrypt: vi.fn(async (value: string) => `encrypted:${value}`),
   decrypt: vi.fn(async (value: string) => value.startsWith('encrypted:') ? value.slice('encrypted:'.length) : null),
 }));
+const webllm = vi.hoisted(() => ({
+  models: [
+    { model_id: 'org/approved-chat-model', model: 'https://huggingface.co/org/approved-chat-model', model_type: 0, vram_required_MB: 1536, low_resource_required: true },
+    { model_id: 'org/vision-model', model: 'https://huggingface.co/org/vision-model', model_type: 2, vram_required_MB: 4096 },
+  ],
+}));
 
 vi.mock('../security/CryptoVault', () => ({ cryptoVault: vault }));
+vi.mock('@mlc-ai/web-llm', () => ({ prebuiltAppConfig: { model_list: webllm.models }, ModelType: { LLM: 0 } }));
 
 import { aiGateway, MODELS } from './AIGateway';
 
@@ -51,7 +58,7 @@ function responseWithChunkedSSE() {
 describe('AIGateway custom OpenAI-compatible endpoint', () => {
   const fetchMock = vi.fn();
 
-  beforeEach(() => {
+  beforeEach(async () => {
     values.clear();
     vault.encrypt.mockClear();
     vault.decrypt.mockClear();
@@ -60,6 +67,7 @@ describe('AIGateway custom OpenAI-compatible endpoint', () => {
     vi.stubGlobal('localStorage', storage);
     vi.stubGlobal('fetch', fetchMock);
     aiGateway.removeCustomEndpoint();
+    await aiGateway.loadKeys();
     aiGateway.setModel(MODELS[0].id);
   });
 
@@ -132,5 +140,47 @@ describe('AIGateway custom OpenAI-compatible endpoint', () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('http://localhost:11434/v1/chat/completions');
     expect(init.headers).not.toHaveProperty('Authorization');
+  });
+
+  it('adds only a pinned prebuilt local model and restores its exact catalog entry from browser storage', async () => {
+    const model = await aiGateway.addPrebuiltLocalModel('org/approved-chat-model');
+
+    expect(model).toMatchObject({
+      id: 'org/approved-chat-model',
+      provider: 'webllm',
+      offlineCapable: true,
+      vramRequiredMB: 1536,
+      lowResourceRequired: true,
+    });
+    expect(aiGateway.getModels().some(item => item.id === model.id)).toBe(true);
+
+    await aiGateway.loadKeys();
+    expect(aiGateway.getModels().find(item => item.id === model.id)).toMatchObject(model);
+
+    aiGateway.removePrebuiltLocalModel(model.id);
+    expect(aiGateway.getModels().some(item => item.id === model.id)).toBe(false);
+  });
+
+  it('rejects arbitrary repositories and non-chat entries that are not supported by the pinned runtime', async () => {
+    await expect(aiGateway.addPrebuiltLocalModel('some-user/random-gguf')).rejects.toThrow('not in the installed WebLLM prebuilt registry');
+    await expect(aiGateway.addPrebuiltLocalModel('org/vision-model')).rejects.toThrow('not in the installed WebLLM prebuilt registry');
+  });
+
+  it('registers public Transformers.js model IDs without accepting URLs or path traversal', async () => {
+    const model = aiGateway.addTransformersCompatibleModel('Xenova/Qwen2.5-Coder-0.5B-Instruct');
+    expect(model).toMatchObject({
+      id: 'transformers:Xenova/Qwen2.5-Coder-0.5B-Instruct',
+      provider: 'transformers',
+      offlineCapable: true,
+      transformersModelId: 'Xenova/Qwen2.5-Coder-0.5B-Instruct',
+    });
+
+    await aiGateway.loadKeys();
+    expect(aiGateway.getModels().find(item => item.id === model.id)).toMatchObject(model);
+    aiGateway.removePrebuiltLocalModel(model.id);
+
+    expect(() => aiGateway.addTransformersCompatibleModel('https://huggingface.co/owner/model')).toThrow('owner/model');
+    expect(() => aiGateway.addTransformersCompatibleModel('owner/../outside')).toThrow('owner/model');
+    expect(() => aiGateway.addTransformersCompatibleModel('owner/model/extra')).toThrow('owner/model');
   });
 });

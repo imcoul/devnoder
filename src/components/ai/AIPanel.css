@@ -6,7 +6,8 @@
 .agent-pill:hover:not(.active) { border-color:var(--color-text-muted); }
 .model-select { flex:1; padding:0.25rem 0.4rem; border:1px solid var(--color-border); border-radius:0.25rem; background:var(--color-surface); color:var(--color-text); font-size:0.75rem; cursor:pointer; }
 .ai-settings-btn { padding:0.25rem 0.5rem; border:1px solid var(--color-border); border-radius:0.25rem; background:none; color:var(--color-text-muted); cursor:pointer; }
-.ai-load-progress { padding:0.3rem 0.6rem; background:#40E0D015; color:var(--color-turquoise); font-size:0.72rem; text-align:center; flex-shrink:0; }
+.ai-load-progress { display:flex; flex-direction:column; gap:0.25rem; padding:0.3rem 0.6rem; background:#40E0D015; color:var(--color-turquoise); font-size:0.72rem; text-align:center; flex-shrink:0; }
+.ai-load-progress progress { inline-size:100%; block-size:0.35rem; accent-color:var(--color-turquoise); }
 .ai-agent-label { display:flex; align-items:center; gap:0.4rem; padding:0.3rem 0.6rem; font-size:0.72rem; color:var(--color-text-muted); background:var(--color-surface); border-block-end:1px solid var(--color-border); flex-shrink:0; }
 .ai-model-badge { margin-inline-start:auto; font-size:0.68rem; color:var(--color-text-muted); }
 .ai-offline-badge { font-size:0.65rem; background:#22c55e20; color:var(--color-success); padding:0.1rem 0.35rem; border-radius:1rem; }
@@ -39,7 +40,7 @@
 .ai-send-btn:disabled { opacity:0.4; cursor:default; }
 .ai-stop-btn { padding:0.3rem 0.8rem; border:1px solid var(--color-error); border-radius:0.25rem; background:none; color:var(--color-error); cursor:pointer; font-size:0.78rem; }
 .ai-settings-overlay { position:fixed; inset:0; background:#0008; z-index:200; display:grid; place-items:center; }
-.ai-settings-modal { background:var(--color-surface); border:1px solid var(--color-border); border-radius:0.5rem; padding:1rem; inline-size:min(90vw,22rem); display:flex; flex-direction:column; gap:0.6rem; }
+.ai-settings-modal { background:var(--color-surface); border:1px solid var(--color-border); border-radius:0.5rem; padding:1rem; inline-size:min(92vw,30rem); max-block-size:90vh; overflow-y:auto; display:flex; flex-direction:column; gap:0.6rem; }
 .ai-settings-head { display:flex; justify-content:space-between; align-items:center; font-weight:700; }
 .ai-settings-head button { background:none; border:none; cursor:pointer; color:var(--color-text-muted); font-size:1.1rem; }
 .ai-key-row { display:flex; flex-direction:column; gap:0.2rem; }
@@ -47,6 +48,17 @@
 .ai-key-row a { color:var(--color-turquoise); }
 .ai-key-row input { padding:0.3rem 0.5rem; border:1px solid var(--color-border); border-radius:0.25rem; background:var(--color-canvas); color:var(--color-text); font-size:0.8rem; }
 .ai-key-note { font-size:0.7rem; color:var(--color-text-muted); }
+.ai-local-model-manager { display:flex; flex-direction:column; gap:0.35rem; padding:0.5rem 0.6rem; background:var(--color-surface); border-block-end:1px solid var(--color-border); flex-shrink:0; }
+.ai-local-model-status { font-size:0.74rem; color:var(--color-turquoise); font-weight:600; }
+.ai-local-model-manager .ai-key-note { margin:0; line-height:1.35; }
+.ai-local-model-error { margin:0; padding:0.35rem 0.5rem; color:var(--color-error); background:#ef444418; border-radius:0.25rem; font-size:0.75rem; overflow-wrap:anywhere; }
+.ai-model-library { display:flex; flex-direction:column; gap:0.35rem; max-block-size:18rem; overflow-y:auto; }
+.ai-model-library-item { display:flex; align-items:center; justify-content:space-between; gap:0.5rem; padding:0.45rem; border:1px solid var(--color-border); border-radius:0.3rem; }
+.ai-model-library-info { display:flex; flex-direction:column; gap:0.15rem; min-inline-size:0; }
+.ai-model-library-info code { color:var(--color-text); font-size:0.68rem; overflow-wrap:anywhere; }
+.ai-model-library-info span { color:var(--color-text-muted); font-size:0.65rem; }
+.ai-model-library-item button { flex-shrink:0; }
+.ai-transformers-model-section { display:flex; flex-direction:column; gap:0.5rem; border-block-start:1px solid var(--color-border); margin-block-start:0.5rem; padding-block-start:0.8rem; }
 
 /* ── Feedback buttons (Sprint 11) ── */
 .msg-feedback { display:flex; align-items:center; gap:0.3rem; margin-block-start:0.4rem; padding-block-start:0.4rem; border-block-start:1px solid var(--color-border); }

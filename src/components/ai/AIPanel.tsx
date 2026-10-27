@@ -21,6 +21,17 @@ interface ChatMessage {
   editDraft?: string;
 }
 
+interface LocalModelProgress {
+  modelId: string;
+  percent: number;
+  label: string;
+}
+
+function formatStorageBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KiB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GiB`;
+}
+
 function ActionBlock({ action }: { action: BoltAction }) {
   const [applied, setApplied] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -145,8 +156,20 @@ export default function AIPanel() {
   const [modelId, setModelId]       = useState(() => localStorage.getItem('devnoder-selected-model') ?? MODELS[0].id);
   const [modelCatalog, setModelCatalog] = useState<ModelConfig[]>(MODELS);
   const [streaming, setStreaming]   = useState(false);
-  const [loadProgress, setLoadProgress] = useState<string | null>(null);
+  const [loadProgress, setLoadProgress] = useState<LocalModelProgress | null>(null);
+  const [cachedFiles, setCachedFiles] = useState<boolean | null>(null);
+  const [modelAction, setModelAction] = useState(false);
+  const [modelError, setModelError] = useState<string | null>(null);
+  const [storageEstimate, setStorageEstimate] = useState<{ usage?: number; quota?: number } | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [prebuiltModels, setPrebuiltModels] = useState<Array<{
+    id: string; repository: string; vramRequiredMB?: number; lowResourceRequired: boolean;
+  }>>([]);
+  const [prebuiltModelsLoaded, setPrebuiltModelsLoaded] = useState(false);
+  const [prebuiltModelsLoading, setPrebuiltModelsLoading] = useState(false);
+  const [prebuiltModelsError, setPrebuiltModelsError] = useState<string | null>(null);
+  const [prebuiltQuery, setPrebuiltQuery] = useState('');
+  const [transformersRepositoryId, setTransformersRepositoryId] = useState('');
   const [keys, setKeys]             = useState({ groq: '', openai: '', anthropic: '', openrouter: '' });
   const [customEndpointConfigured, setCustomEndpointConfigured] = useState(false);
   const [customEndpointForm, setCustomEndpointForm] = useState({
@@ -158,6 +181,7 @@ export default function AIPanel() {
   const activeId     = useStore($activeBuffer);
   const buffers      = useStore($buffers);
   const activeBuffer = buffers.find(b => b.id === activeId);
+  const selectedModel = modelCatalog.find(m => m.id === modelId) ?? MODELS[0];
 
   useEffect(() => {
     void aiGateway.loadKeys().then(() => {
@@ -180,8 +204,50 @@ export default function AIPanel() {
     }).catch(error => showToast({
       type: 'error', message: error instanceof Error ? error.message : 'AI settings could not be loaded',
     }));
-    webLLMManager.onProgress((p, label) => setLoadProgress(p < 100 ? `${label} (${p}%)` : null));
+    const unsubscribeProgress = webLLMManager.onProgress((percent, label, progressModelId) => {
+      setLoadProgress({ modelId: progressModelId, percent, label });
+    });
+    return unsubscribeProgress;
   }, []);
+
+  useEffect(() => {
+    if (!selectedModel.offlineCapable) {
+      setCachedFiles(null);
+      setModelError(null);
+      return;
+    }
+    let active = true;
+    setCachedFiles(null);
+    setModelError(null);
+    void webLLMManager.hasCachedModelFiles(modelId)
+      .then(result => { if (active) setCachedFiles(result); })
+      .catch(() => { if (active) setCachedFiles(null); });
+    if (typeof navigator !== 'undefined' && navigator.storage?.estimate) {
+      void navigator.storage.estimate().then(result => {
+        if (active) setStorageEstimate({ usage: result.usage, quota: result.quota });
+      }).catch(() => { if (active) setStorageEstimate(null); });
+    }
+    return () => { active = false; };
+  }, [modelId, selectedModel.offlineCapable]);
+
+  useEffect(() => {
+    if (!showSettings || prebuiltModelsLoaded || prebuiltModelsLoading) return;
+    let active = true;
+    setPrebuiltModelsLoading(true);
+    setPrebuiltModelsError(null);
+    void import('../../services/ai/LocalModelCatalog').then(module => module.listPrebuiltLocalModels())
+      .then(models => { if (active) setPrebuiltModels(models); })
+      .catch(error => {
+        if (active) setPrebuiltModelsError(error instanceof Error ? error.message : 'The local model catalog could not be loaded.');
+      })
+      .finally(() => {
+        setPrebuiltModelsLoading(false);
+        if (active) {
+          setPrebuiltModelsLoaded(true);
+        }
+      });
+    return () => { active = false; };
+  }, [showSettings, prebuiltModelsLoaded, prebuiltModelsLoading]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
   useEffect(() => {
@@ -319,7 +385,90 @@ export default function AIPanel() {
     showToast({ type: 'info', message: 'Custom endpoint removed from this browser.' });
   };
 
-  const selectedModel = modelCatalog.find(m => m.id === modelId) ?? MODELS[0];
+  const prepareSelectedLocalModel = async () => {
+    if (modelAction || !selectedModel.offlineCapable) return;
+    setModelAction(true);
+    setModelError(null);
+    try {
+      if (!navigator.onLine && !webLLMManager.isLoadedFor(modelId)) {
+        const cached = await webLLMManager.hasCachedModelFiles(modelId);
+        if (!cached) throw new Error('You are offline and this model is not confirmed in the browser cache. Reconnect before preparing it.');
+      }
+      await webLLMManager.load(modelId);
+      setCachedFiles(true);
+      showToast({ type: 'success', message: `${selectedModel.label} is ready in this tab.` });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'The local model could not be prepared.';
+      setModelError(message);
+      showToast({ type: 'error', message });
+    } finally {
+      setModelAction(false);
+    }
+  };
+
+  const unloadSelectedLocalModel = async () => {
+    if (modelAction) return;
+    setModelAction(true);
+    setModelError(null);
+    try {
+      await webLLMManager.unload();
+      showToast({ type: 'info', message: `${selectedModel.label} unloaded from this tab.` });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'The local model could not be unloaded.';
+      setModelError(message);
+    } finally {
+      setModelAction(false);
+    }
+  };
+
+  const clearSelectedModelCache = async () => {
+    if (modelAction || !window.confirm(`Remove cached files for ${selectedModel.label} from this browser? The model will need to download again.`)) return;
+    setModelAction(true);
+    setModelError(null);
+    try {
+      await webLLMManager.deleteCachedModelFiles(modelId);
+      setCachedFiles(false);
+      showToast({ type: 'success', message: 'Model cache removed from this browser.' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'The cached model files could not be removed.';
+      setModelError(message);
+    } finally {
+      setModelAction(false);
+    }
+  };
+
+  const addPrebuiltLocalModel = async (localId: string) => {
+    try {
+      const added = await aiGateway.addPrebuiltLocalModel(localId);
+      setModelCatalog(aiGateway.getModels());
+      setModelId(added.id);
+      setShowSettings(false);
+      showToast({ type: 'success', message: `${added.label} added. Select Download & load to fetch it on this device.` });
+    } catch (error) {
+      showToast({ type: 'error', message: error instanceof Error ? error.message : 'This model could not be added.' });
+    }
+  };
+
+  const addTransformersModel = () => {
+    try {
+      const added = aiGateway.addTransformersCompatibleModel(transformersRepositoryId);
+      setModelCatalog(aiGateway.getModels());
+      setModelId(added.id);
+      setTransformersRepositoryId('');
+      setShowSettings(false);
+      showToast({ type: 'success', message: `${added.label} added. Select Download & load to test and cache it on this device.` });
+    } catch (error) {
+      showToast({ type: 'error', message: error instanceof Error ? error.message : 'This repository ID is not valid.' });
+    }
+  };
+
+  const webgpuAvailable = typeof navigator !== 'undefined' && 'gpu' in navigator;
+  const modelRuntimeAvailable = webgpuAvailable || !!selectedModel.transformersModelId;
+  const selectedModelProgress = loadProgress?.modelId === modelId ? loadProgress : null;
+  const filteredPrebuiltModels = prebuiltModels
+    .filter(model => model.id.toLowerCase().includes(prebuiltQuery.trim().toLowerCase()))
+    .slice(0, 8);
+  const localModelIsLoaded = webLLMManager.isLoadedFor(modelId);
 
   return (
     <div className="ai-panel">
@@ -338,20 +487,70 @@ export default function AIPanel() {
             </option>
           ))}
         </select>
-        <button className="ai-settings-btn" onClick={() => setShowSettings(s => !s)} aria-label="AI provider API keys">⚙</button>
+        <button className="ai-settings-btn" onClick={() => setShowSettings(s => !s)} aria-label="AI provider and model settings">⚙</button>
       </div>
 
-      {loadProgress && <div className="ai-load-progress">{loadProgress}</div>}
+      {selectedModelProgress && (
+        <div className="ai-load-progress" role="status" aria-live="polite">
+          <span>{selectedModelProgress.label} ({selectedModelProgress.percent}%)</span>
+          <progress max={100} value={selectedModelProgress.percent} aria-label="Local model download progress" />
+        </div>
+      )}
 
       <div className="ai-agent-label">
         {AGENTS.find(a => a.id === agentId)?.icon} {AGENTS.find(a => a.id === agentId)?.label} Agent
         <span className="ai-model-badge">{selectedModel.label}</span>
         {selectedModel.offlineCapable && (
-          <span className="ai-offline-badge" title="On-device model. Its weights download on first use; offline use requires the browser to retain the cache.">
-            On-device · first use downloads
+          <span className="ai-offline-badge" title="On-device model. Prepare it explicitly below; the browser may evict cached weights.">
+            On-device model
           </span>
         )}
       </div>
+
+      {selectedModel.offlineCapable && (
+        <section className="ai-local-model-manager" aria-label="Local model download and cache">
+          <div className="ai-local-model-status" role="status" aria-live="polite">
+            {localModelIsLoaded
+              ? 'Ready in this tab'
+              : cachedFiles === true
+                ? 'Cached model files found — load to verify they are complete'
+                : cachedFiles === false
+                  ? 'Model files are not cached; preparing will download them'
+                  : 'Checking local cache…'}
+          </div>
+          {selectedModel.vramRequiredMB !== undefined && (
+            <p className="ai-key-note">
+              WebLLM registry estimate: {Math.round(selectedModel.vramRequiredMB)} MiB GPU memory. This is a runtime-memory estimate, not the download size.
+            </p>
+          )}
+          {storageEstimate?.quota !== undefined && (
+            <p className="ai-key-note">
+              Browser origin storage: approximately {formatStorageBytes(storageEstimate.usage ?? 0)} used of {formatStorageBytes(storageEstimate.quota)}. The browser controls eviction; this figure is not a model-size estimate.
+            </p>
+          )}
+          {localModelIsLoaded ? (
+            <button className="ai-clear-btn" onClick={unloadSelectedLocalModel} disabled={modelAction}>
+              {modelAction ? 'Unloading…' : 'Unload from this tab'}
+            </button>
+          ) : (
+            <button className="ai-send-btn" onClick={prepareSelectedLocalModel}
+              disabled={modelAction || !modelRuntimeAvailable || (cachedFiles === null && !navigator.onLine)}>
+              {modelAction ? 'Preparing model…' : cachedFiles ? 'Load model on this device' : 'Download & load model'}
+            </button>
+          )}
+          {!modelRuntimeAvailable && <p className="ai-key-note">This model needs WebGPU on this browser. The current browser exposes no WebGPU runtime and this model has no validated WASM fallback.</p>}
+          {modelError && <p className="ai-local-model-error" role="alert">{modelError}</p>}
+          {(cachedFiles || localModelIsLoaded) && (
+            <button className="ai-clear-btn" onClick={clearSelectedModelCache} disabled={modelAction}>
+              Remove this model’s cached files
+            </button>
+          )}
+          <p className="ai-key-note">
+            Local models are limited to the pinned WebLLM registry or compatible Transformers.js ONNX repositories. Downloads may be large, require network access and cannot be reliably cancelled by this runtime. Browser storage is best-effort; offline use is not guaranteed.
+          </p>
+          <button className="ai-set-default-btn" onClick={() => setShowSettings(true)}>Browse supported local models</button>
+        </section>
+      )}
 
       <div className="ai-messages">
         {messages.length === 0 && (
@@ -394,7 +593,7 @@ export default function AIPanel() {
         <div className="ai-settings-overlay" onClick={() => setShowSettings(false)}>
           <div className="ai-settings-modal" onClick={e => e.stopPropagation()}>
             <div className="ai-settings-head">
-              <span>API Keys</span>
+              <span>AI and model settings</span>
               <button onClick={() => setShowSettings(false)} aria-label="Close">×</button>
             </div>
             {[
@@ -412,6 +611,61 @@ export default function AIPanel() {
             ))}
             <button className="ai-send-btn" onClick={saveKeys}>Save Keys</button>
             <p className="ai-key-note">Keys stored locally — never sent to Srvel or anywhere except your chosen provider.</p>
+
+            <section style={{ borderTop: '1px solid var(--color-border)', marginTop: '1rem', paddingTop: '1rem' }}>
+              <h3 style={{ margin: '0 0 0.5rem' }}>Supported on-device model catalog</h3>
+              <p className="ai-key-note">
+                Search the prebuilt chat-model registry shipped with this WebLLM version. For a public Hugging Face model outside that list, use the Transformers.js-compatible ONNX option below. Neither path accepts GGUF files; model sizes vary and the browser controls storage eviction.
+              </p>
+              <div className="ai-key-row">
+                <label htmlFor="prebuilt-model-search">Search model IDs</label>
+                <input id="prebuilt-model-search" value={prebuiltQuery}
+                  onChange={e => setPrebuiltQuery(e.target.value)} placeholder="e.g. Qwen, Llama, Phi" />
+              </div>
+              {prebuiltModelsLoading && <p role="status">Loading compatible model registry…</p>}
+              {prebuiltModelsError && <p className="ai-local-model-error" role="alert">{prebuiltModelsError}</p>}
+              <div className="ai-model-library" role="list" aria-label="Compatible prebuilt local models">
+                {filteredPrebuiltModels.map(model => {
+                  const alreadyAdded = modelCatalog.some(item => item.id === model.id);
+                  return (
+                    <div key={model.id} className="ai-model-library-item" role="listitem">
+                      <div className="ai-model-library-info">
+                        <code>{model.id}</code>
+                        <span>
+                          {model.vramRequiredMB !== undefined
+                            ? `~${Math.round(model.vramRequiredMB)} MiB runtime GPU memory`
+                            : 'GPU memory estimate unavailable'}
+                          {model.lowResourceRequired ? ' · low-resource profile' : ''}
+                        </span>
+                      </div>
+                      <button type="button" className="ai-set-default-btn" disabled={alreadyAdded}
+                        onClick={() => void addPrebuiltLocalModel(model.id)}>
+                        {alreadyAdded ? 'In picker' : 'Add & select'}
+                      </button>
+                    </div>
+                  );
+                })}
+                {prebuiltModelsLoaded && filteredPrebuiltModels.length === 0 && <p>No matching models in this pinned registry.</p>}
+              </div>
+              {filteredPrebuiltModels.length > 0 && <p className="ai-key-note">Showing up to 8 matching entries. Add a model, then use Download &amp; load in the AI panel. Repository: {filteredPrebuiltModels[0].repository}</p>}
+            </section>
+
+            <section className="ai-transformers-model-section">
+              <h3 style={{ margin: '0 0 0.5rem' }}>Public Transformers.js model repository</h3>
+              <div className="ai-key-row">
+                <label htmlFor="transformers-model-repository">Hugging Face owner/model</label>
+                <input id="transformers-model-repository" value={transformersRepositoryId}
+                  onChange={e => setTransformersRepositoryId(e.target.value)}
+                  placeholder="Xenova/Qwen2.5-Coder-0.5B-Instruct" autoCapitalize="none" autoCorrect="off" />
+              </div>
+              <button type="button" className="ai-send-btn" onClick={addTransformersModel}
+                disabled={!transformersRepositoryId.trim()}>
+                Add compatible HF model
+              </button>
+              <p className="ai-key-note">
+                The repository must be public and contain ONNX model artifacts supported by Transformers.js for text generation. This field accepts only an owner/model ID, not a URL, private repository, GGUF file, or arbitrary model format. The repository is not verified until you prepare it; unsupported models will show a loader error.
+              </p>
+            </section>
 
             <section style={{ borderTop: '1px solid var(--color-border)', marginTop: '1rem', paddingTop: '1rem' }}>
               <h3 style={{ margin: '0 0 0.5rem' }}>Custom OpenAI-compatible model server</h3>

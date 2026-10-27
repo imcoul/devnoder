@@ -1,8 +1,13 @@
 // AIGateway.ts — 13 models, multi-provider streaming, tool-calling loop (Sprint 12)
 import { mcpClient } from './MCPClient';
 import { cryptoVault } from '../security/CryptoVault';
+import {
+  isValidTransformersRepoId,
+  readSavedLocalModels,
+  writeSavedLocalModels,
+} from './LocalModelCatalog';
 
-export type Provider = 'webllm' | 'groq' | 'openai' | 'anthropic' | 'openrouter' | 'litellm' | 'openai-compatible';
+export type Provider = 'webllm' | 'transformers' | 'groq' | 'openai' | 'anthropic' | 'openrouter' | 'litellm' | 'openai-compatible';
 
 export interface ModelConfig {
   id: string; label: string; provider: Provider;
@@ -10,12 +15,15 @@ export interface ModelConfig {
   supportsTools?: boolean;
   /** Exact Hugging Face model used when this selection has a supported WASM path. */
   transformersModelId?: string;
+  /** Runtime-published VRAM estimate in MiB; not a model download-size estimate. */
+  vramRequiredMB?: number;
+  lowResourceRequired?: boolean;
 }
 
 export const MODELS: ModelConfig[] = [
-  { id: 'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC', label: 'Qwen 0.5B (local)',      provider: 'webllm',    contextWindow: 32768,  free: true,  offlineCapable: true,  supportsTools: true, transformersModelId: 'Xenova/Qwen2.5-Coder-0.5B-Instruct' },
-  { id: 'Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC', label: 'Qwen 1.5B (WebGPU)',     provider: 'webllm',    contextWindow: 32768,  free: true,  offlineCapable: true,  supportsTools: true  },
-  { id: 'Phi-3.5-mini-instruct-q4f16_1-MLC',        label: 'Phi 3.5 Mini (local)',   provider: 'webllm',    contextWindow: 128000, free: true,  offlineCapable: true,  supportsTools: false },
+  { id: 'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC', label: 'Qwen 0.5B (local)',      provider: 'webllm',    contextWindow: 32768,  free: true,  offlineCapable: true,  supportsTools: true, transformersModelId: 'Xenova/Qwen2.5-Coder-0.5B-Instruct', vramRequiredMB: 944.62, lowResourceRequired: true },
+  { id: 'Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC', label: 'Qwen 1.5B (WebGPU)',     provider: 'webllm',    contextWindow: 32768,  free: true,  offlineCapable: true,  supportsTools: true, vramRequiredMB: 1629.75, lowResourceRequired: false },
+  { id: 'Phi-3.5-mini-instruct-q4f16_1-MLC',        label: 'Phi 3.5 Mini (local)',   provider: 'webllm',    contextWindow: 128000, free: true,  offlineCapable: true,  supportsTools: false, vramRequiredMB: 3672.07, lowResourceRequired: false },
   { id: 'llama-3.1-8b-instant',                     label: 'Llama 3.1 8B (Groq)',    provider: 'groq',      contextWindow: 131072, free: true,  offlineCapable: false, supportsTools: true  },
   { id: 'llama-3.3-70b-versatile',                  label: 'Llama 3.3 70B (Groq)',   provider: 'groq',      contextWindow: 131072, free: true,  offlineCapable: false, supportsTools: true  },
   { id: 'mixtral-8x7b-32768',                       label: 'Mixtral 8x7B (Groq)',    provider: 'groq',      contextWindow: 32768,  free: true,  offlineCapable: false, supportsTools: true  },
@@ -107,12 +115,13 @@ class AIGateway {
   private modelId = MODELS[0].id;
   private keys: Partial<Record<Provider, string>> = {};
   private customEndpoint: CustomEndpoint | null = null;
+  private addedLocalModels: ModelConfig[] = [];
 
   setModel(id: string) {
     this.modelId = this.getModels().some(model => model.id === id) ? id : MODELS[0].id;
   }
   getModels(): ModelConfig[] {
-    const models = [...MODELS];
+    const models = [...MODELS, ...this.addedLocalModels];
     if (this.customEndpoint) models.push({
       id: 'custom-openai-compatible',
       label: `${this.customEndpoint.label} · ${this.customEndpoint.model}`,
@@ -121,6 +130,84 @@ class AIGateway {
     });
     return models;
   }
+
+  async addPrebuiltLocalModel(modelId: string): Promise<ModelConfig> {
+    const { listPrebuiltLocalModels } = await import('./LocalModelCatalog');
+    const registry = await listPrebuiltLocalModels();
+    const entry = registry.find(model => model.id === modelId);
+    if (!entry) throw new Error('This model is not in the installed WebLLM prebuilt registry. Arbitrary model files and repositories are not supported.');
+    const existing = this.getModels().find(model => model.id === entry.id);
+    if (existing) return existing;
+
+    const added: ModelConfig = {
+      id: entry.id,
+      label: entry.id,
+      provider: 'webllm',
+      contextWindow: 4096,
+      free: true,
+      offlineCapable: true,
+      vramRequiredMB: entry.vramRequiredMB,
+      lowResourceRequired: entry.lowResourceRequired,
+    };
+    this.addedLocalModels = [...this.addedLocalModels, added];
+    writeSavedLocalModels(this.addedLocalModels.map(model => ({
+      id: model.id,
+      label: model.label,
+      provider: model.provider === 'transformers' ? 'transformers' : 'webllm',
+      transformersModelId: model.transformersModelId,
+      vramRequiredMB: model.vramRequiredMB,
+      lowResourceRequired: model.lowResourceRequired,
+    })));
+    return added;
+  }
+
+  addTransformersCompatibleModel(repositoryId: string): ModelConfig {
+    const id = repositoryId.trim();
+    if (!isValidTransformersRepoId(id)) {
+      throw new Error('Enter a Hugging Face repository ID in the form owner/model. URLs, private repositories, and GGUF files are not supported here.');
+    }
+    const modelId = `transformers:${id}`;
+    const existing = this.getModels().find(model => model.id === modelId);
+    if (existing) return existing;
+
+    const added: ModelConfig = {
+      id: modelId,
+      label: `HF · ${id}`,
+      provider: 'transformers',
+      contextWindow: 2048,
+      free: true,
+      offlineCapable: true,
+      supportsTools: false,
+      transformersModelId: id,
+    };
+    this.addedLocalModels = [...this.addedLocalModels, added];
+    writeSavedLocalModels(this.addedLocalModels.map(model => ({
+      id: model.id,
+      label: model.label,
+      provider: model.provider === 'transformers' ? 'transformers' : 'webllm',
+      transformersModelId: model.transformersModelId,
+      vramRequiredMB: model.vramRequiredMB,
+      lowResourceRequired: model.lowResourceRequired,
+    })));
+    return added;
+  }
+
+  removePrebuiltLocalModel(modelId: string): void {
+    if (MODELS.some(model => model.id === modelId)) {
+      throw new Error('Built-in models cannot be removed from the catalog.');
+    }
+    this.addedLocalModels = this.addedLocalModels.filter(model => model.id !== modelId);
+    writeSavedLocalModels(this.addedLocalModels.map(model => ({
+      id: model.id,
+      label: model.label,
+      provider: model.provider === 'transformers' ? 'transformers' : 'webllm',
+      transformersModelId: model.transformersModelId,
+      vramRequiredMB: model.vramRequiredMB,
+      lowResourceRequired: model.lowResourceRequired,
+    })));
+    if (this.modelId === modelId) this.modelId = MODELS[0].id;
+  }
+
   getModel() { return this.getModels().find(m => m.id === this.modelId) ?? MODELS[0]; }
 
   getCustomEndpointSettings(): OpenAICompatibleSettings | null {
@@ -182,6 +269,20 @@ class AIGateway {
 
   async loadKeys(): Promise<void> {
     if (typeof localStorage === 'undefined') return;
+    this.addedLocalModels = readSavedLocalModels()
+      .filter(model => !MODELS.some(builtIn => builtIn.id === model.id))
+      .map(model => ({
+        id: model.id,
+        label: model.label,
+        provider: model.provider === 'transformers' ? 'transformers' as const : 'webllm' as const,
+        contextWindow: model.provider === 'transformers' ? 2048 : 4096,
+        free: true,
+        offlineCapable: true,
+        supportsTools: model.provider === 'transformers' ? false : undefined,
+        transformersModelId: model.transformersModelId,
+        vramRequiredMB: model.vramRequiredMB,
+        lowResourceRequired: model.lowResourceRequired,
+      }));
     for (const p of ['groq', 'openai', 'anthropic', 'openrouter', 'openai-compatible'] as Provider[]) {
       const stored = localStorage.getItem(`devnoder-key-${p}`);
       if (!stored) continue;
