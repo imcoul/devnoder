@@ -1,62 +1,83 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { cloudExecutor, type CloudResult } from '../terminal/CloudExecutor';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cloudExecutor } from '../terminal/CloudExecutor';
 
-vi.mock('@cloudflare/sandbox', () => ({
-  getSandbox: vi.fn(() => ({
-    exec: vi.fn(),
-    tunnels: { get: vi.fn() },
-  })),
-  proxyToSandbox: vi.fn(async () => null),
-  Sandbox: class Sandbox {},
-}));
+const workingHealth = {
+  status: 'ok',
+  configured: true,
+  capabilities: { execute: true, tunnel: true },
+};
 
-describe('CloudExecutor', () => {
+describe('CloudExecutor browser-to-Worker contract', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     cloudExecutor.available = false;
     cloudExecutor.lastChecked = 0;
-    cloudExecutor.sandboxReady = false;
-    cloudExecutor.sandboxInstance = null;
+    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('network offline'))));
   });
 
-  it('starts unavailable by default', async () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('starts unavailable when the Worker cannot be reached', async () => {
     const result = await cloudExecutor.run('print(1)', 'python');
     expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain('not deployed');
+    expect(result.stderr).toContain('not configured');
   });
 
-  it('checkAvailability probes fallback worker', async () => {
-    global.fetch = vi.fn(() =>
-      Promise.resolve(new Response(JSON.stringify({ status: 'ok' }), { status: 200 }))
-    ) as any;
-    const available = await cloudExecutor.checkAvailability();
-    expect(available).toBe(true);
+  it('accepts only a health response advertising configured execution capability', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify(workingHealth), { status: 200 }))));
+    expect(await cloudExecutor.checkAvailability()).toBe(true);
     expect(cloudExecutor.available).toBe(true);
   });
 
-  it('checkAvailability handles network errors', async () => {
-    global.fetch = vi.fn(() => Promise.reject(new Error('network'))) as any;
-    const available = await cloudExecutor.checkAvailability();
-    expect(available).toBe(false);
+  it('does not treat a live but unconfigured Worker as a usable executor', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify({ status: 'ok', configured: false }), { status: 200 }))));
+    expect(await cloudExecutor.checkAvailability()).toBe(false);
     expect(cloudExecutor.available).toBe(false);
   });
 
-  it('tunnels returns empty when unavailable', async () => {
-    const url = await cloudExecutor.tunnel(8080);
-    expect(url).toBe('');
+  it('requires explicit execute capability even if the Worker otherwise reports ready', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify({ status: 'ok', configured: true }), { status: 200 }))));
+    expect(await cloudExecutor.checkAvailability()).toBe(false);
   });
 
-  it('uses sandbox when initialized', async () => {
-    const mockSandbox = {
-      exec: vi.fn(() => Promise.resolve({ stdout: '42', stderr: '', exitCode: 0, success: true, command: '' })),
-      tunnels: { get: vi.fn(() => Promise.resolve({ url: 'https://test.trycloudflare.com' })) },
-    };
-    cloudExecutor.sandboxReady = true;
-    cloudExecutor.sandboxInstance = mockSandbox as any;
+  it('handles health network errors and keeps the service unavailable', async () => {
+    expect(await cloudExecutor.checkAvailability()).toBe(false);
+    expect(cloudExecutor.available).toBe(false);
+  });
 
-    const result = await cloudExecutor.run('python', 'python');
-    expect(mockSandbox.exec).toHaveBeenCalledWith('python', { timeout: 10000 });
+  it('runs through the Worker only after a capability-positive health check', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(workingHealth), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ stdout: '42', stderr: '', exitCode: 0 }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await cloudExecutor.run('print(1)', 'python');
     expect(result.stdout).toBe('42');
     expect(result.exitCode).toBe(0);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[1][0])).toContain('/execute');
+  });
+
+  it('turns off remote execution after an unimplemented endpoint response', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(workingHealth), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: 'not configured' }), { status: 501 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await cloudExecutor.run('print(1)', 'python');
+    expect(result.stderr).toBe('HTTP 501');
+    expect(cloudExecutor.available).toBe(false);
+  });
+
+  it('does not request a tunnel while the executor is unavailable', async () => {
+    expect(await cloudExecutor.tunnel(8080)).toBe('');
+  });
+
+  it('returns a tunnel only after a positive health check', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(workingHealth), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ url: 'https://preview.example.test' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    expect(await cloudExecutor.tunnel(8080)).toBe('https://preview.example.test');
   });
 });

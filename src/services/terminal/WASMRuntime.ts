@@ -3,6 +3,8 @@ export type Runtime = 'quickjs' | 'pyodide' | 'php' | 'ruby';
 
 export interface RunResult { stdout: string; stderr: string; exitCode: number; }
 
+declare const __PYODIDE_VERSION__: string;
+
 class WASMRuntime {
   private quickjs: any = null;
   private pyodide: any = null;
@@ -40,8 +42,13 @@ class WASMRuntime {
   async runPython(code: string): Promise<RunResult> {
     try {
       if (!this.pyodide) {
-        const { loadPyodide } = await import('pyodide' as any);
-        this.pyodide = await loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.29.4/full/' });
+        const indexURL = `https://cdn.jsdelivr.net/pyodide/v${__PYODIDE_VERSION__}/full/`;
+        const moduleUrl = `${indexURL}pyodide.mjs`;
+        // The browser package ships a 29 MiB ICU data file that cannot be
+        // uploaded as one Cloudflare Pages asset. Fetch the version-matched
+        // official module lazily only when Python is first run.
+        const { loadPyodide } = await import(/* @vite-ignore */ moduleUrl) as typeof import('pyodide');
+        this.pyodide = await loadPyodide({ indexURL });
       }
       const stdout: string[] = [];
       this.pyodide.setStdout({ batched: (s: string) => stdout.push(s) });

@@ -1,5 +1,6 @@
 // TemplateService.ts — 7 starter templates, offline, creates files via lightning-fs
 import Dexie, { Table } from 'dexie';
+import { EXECUTOR_BASE_URL } from '../../config/serviceEndpoints';
 
 export interface Template {
   id: string;
@@ -616,7 +617,7 @@ export class TemplateService {
 }
 
 // ─── Community registry ──────────────────────────────────────────────────────
-const TEMPLATES_REGISTRY_URL = 'https://devnoder-executor.srvel-build.workers.dev/templates';
+const TEMPLATES_REGISTRY_URL = `${EXECUTOR_BASE_URL}/templates`;
 
 export class TemplateCommunityService {
   /** Fetch community-shared templates from CF Worker / D1 */

@@ -1,5 +1,7 @@
 // ComputePool.ts — community compute sharing via Cloudflare Workers
-const POOL_WORKER = 'https://devnoder-executor.srvel-build.workers.dev/pool';
+import { EXECUTOR_BASE_URL } from '../../config/serviceEndpoints';
+
+const POOL_WORKER = `${EXECUTOR_BASE_URL}/pool`;
 
 export interface PoolTask {
   id: string;

@@ -1,5 +1,6 @@
 // PreviewService.ts — local iframe + Cloudflare Tunnel + deploy
 import { cloudExecutor } from '../terminal/CloudExecutor';
+import { EXECUTOR_BASE_URL } from '../../config/serviceEndpoints';
 
 export interface DeployResult { url: string; id: string; timestamp: number; }
 export interface TunnelResult { url: string; port: number; active: boolean; }
@@ -62,7 +63,7 @@ class PreviewService {
   async deploy(files: Record<string, string>): Promise<DeployResult> {
     this.log('info', 'Starting deployment to Cloudflare Pages…');
     try {
-      const res = await fetch('https://devnoder-executor.srvel-build.workers.dev/deploy', {
+      const res = await fetch(`${EXECUTOR_BASE_URL}/deploy`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ files }),

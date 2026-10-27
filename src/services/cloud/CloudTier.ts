@@ -6,6 +6,7 @@
 
 import { atom } from 'nanostores'
 import { getSetting, setSetting } from '../storage/db'
+import { EXECUTOR_BASE_URL } from '../../config/serviceEndpoints'
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -73,7 +74,7 @@ export async function loadSubscription(): Promise<void> {
   if (!token || !navigator.onLine) return
 
   try {
-    const res = await fetch('https://devnoder-executor.srvel-build.workers.dev/billing/subscription', {
+    const res = await fetch(`${EXECUTOR_BASE_URL}/billing/subscription`, {
       headers: { 'Authorization': `Bearer ${token}` },
     })
     if (!res.ok) return
@@ -117,7 +118,7 @@ export function isHosted(): boolean {
 // ── Stripe checkout ───────────────────────────────────────────
 
 const STRIPE_PUBLISHABLE_KEY = 'pk_live_REPLACE_WITH_STRIPE_KEY'
-const CHECKOUT_WORKER        = 'https://devnoder-executor.srvel-build.workers.dev/billing'
+const CHECKOUT_WORKER        = `${EXECUTOR_BASE_URL}/billing`
 
 export async function startCheckout(tier: 'hosted' | 'team', seats = 1): Promise<void> {
   if (!navigator.onLine) throw new Error('Internet required to subscribe')

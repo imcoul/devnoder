@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { EXECUTOR_BASE_URL } from '../../config/serviceEndpoints';
 import { skillStore, Skill, TriggerType, ContextInjector, InjectorType } from '../../services/ai/SkillStore';
 import { skillsEngine } from '../../services/ai/SkillsEngine';
 import { AGENTS, AgentId } from '../../services/ai/AIAgents';
@@ -32,7 +33,7 @@ const SOURCE_COLORS: Record<Skill['source'], string> = {
 };
 
 // Community registry — fetches from CF Worker / D1, falls back to built-in seed
-const SKILLS_REGISTRY_URL = 'https://devnoder-executor.srvel-build.workers.dev/skills';
+const SKILLS_REGISTRY_URL = `${EXECUTOR_BASE_URL}/skills`;
 
 const COMMUNITY_SKILLS_SEED: Skill[] = [
   {

@@ -1,5 +1,7 @@
 // SubscriptionService.ts — tiers, feature gates, $0 start
-const EXECUTOR_URL = 'https://devnoder-executor.srvel-build.workers.dev';
+import { EXECUTOR_BASE_URL } from '../../config/serviceEndpoints';
+
+const EXECUTOR_URL = EXECUTOR_BASE_URL;
 
 export type Tier = 'free' | 'pro' | 'team';
 
