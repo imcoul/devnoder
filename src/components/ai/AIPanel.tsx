@@ -3,6 +3,7 @@ import { aiGateway, MODELS, type Message, type ModelConfig, type ToolCallEvent }
 import { AGENTS, AgentId, agentRunner } from '../../services/ai/AIAgents';
 import { parseMessage, BoltAction } from '../../services/ai/StreamingMessageParser';
 import { webLLMManager } from '../../services/ai/WebLLMManager';
+import { getLocalModelStatus } from '../../services/ai/LocalModelStatus';
 import { writeFile } from '../../services/git/GitService';
 import { bufferManager, $activeBuffer, $buffers } from '../../services/editor/BufferManager';
 import { feedbackStore } from '../../services/ai/FeedbackStore';
@@ -282,8 +283,8 @@ export default function AIPanel() {
 
   const webgpuAvailable = typeof navigator !== 'undefined' && 'gpu' in navigator;
   const modelRuntimeAvailable = webgpuAvailable || !!selectedModel.transformersModelId;
-  const selectedModelProgress = loadProgress?.modelId === modelId ? loadProgress : null;
   const localModelIsLoaded = webLLMManager.isLoadedFor(modelId);
+  const selectedModelProgress = loadProgress?.modelId === modelId && !localModelIsLoaded ? loadProgress : null;
   const activeLocalRuntime = webLLMManager.getActiveRuntimeInfo(modelId);
   const availableRuntimeLabel = selectedModel.provider === 'transformers'
     ? 'Transformers.js / WASM'
@@ -459,6 +460,7 @@ export default function AIPanel() {
       showToast({ type: 'error', message });
     } finally {
       setModelAction(false);
+      setLoadProgress(progress => progress?.modelId === modelId ? null : progress);
     }
   };
 
@@ -521,17 +523,13 @@ export default function AIPanel() {
   const filteredPrebuiltModels = prebuiltModels
     .filter(model => model.id.toLowerCase().includes(prebuiltQuery.trim().toLowerCase()))
     .slice(0, 8);
-  const localStatus = selectedModel.offlineCapable
-    ? selectedModelProgress
-      ? 'Downloading'
-      : localModelIsLoaded
-        ? 'Ready in this tab'
-        : cachedFiles === true
-          ? 'Requires setup'
-          : cachedFiles === false
-            ? 'Not set up'
-            : 'Checking setup…'
-    : setupState.configured ? 'Ready to use' : 'Requires setup';
+  const localStatus = getLocalModelStatus({
+    offlineCapable: selectedModel.offlineCapable,
+    loaded: localModelIsLoaded,
+    hasProgress: !!selectedModelProgress,
+    cachedFiles,
+    configured: setupState.configured,
+  });
 
   return (
     <div className="ai-panel">
