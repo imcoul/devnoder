@@ -1,51 +1,29 @@
-# DevNoder — current release and service gaps
+# DevNoder — current release and infrastructure boundaries
 
-**Snapshot:** 27 October 2026. The frontend is now publicly live at [devnoder.srvel.net](https://devnoder.srvel.net). Cloudflare Pages project `devnoder` builds from `codex/repair-first-project`, the repair branch the owner explicitly selected for direct production deployment. The GitHub public `main` branch was not changed; draft PR #3 against `develop` remains open and unmerged. Because that branch is the Pages production branch, future pushes to it may automatically update the live site.
+Canonical product: https://devnoder.srvel.net. Pages project `devnoder` builds `codex/repair-first-project`, the explicitly authorized production source. PR #3 remains draft to develop; main/develop are unmerged. Pushing this branch updates production. Public Source links open the deployed branch rather than stale main documentation.
 
-## Live deployment and infrastructure
+## Product repair — 28 October 2026
 
-- Cloudflare Pages reports the custom domain active. The only `devnoder.srvel.net` DNS record is a proxied CNAME to `devnoder.pages.dev`.
-- The live URL returns HTTP 200 with the DevNoder application title. The referenced JavaScript returns 200. The ONNX WASM asset is returned with `Content-Type: application/wasm` and `Content-Encoding: gzip`.
-- The account also contains Worker scripts named `devnoder`, `devnoder-executor`, `devnoder-oauth`, and `devnoder-collab`, under the verified `ibrahimmamadoucoulibaly.workers.dev` subdomain. Script existence does not mean that product APIs work.
-- The executor is not configured; `/skills`, `/execute`, and `/deploy` return HTTP 501. The browser client keeps cloud execution disabled unless the Worker advertises an explicitly configured execution capability.
-- The collaboration script exists, but its checked health route returned 404; a working Durable Object/Yjs session has not been proved.
-- The OAuth callback/state/scopes remain unverified. The app offers a user-provided fine-grained PAT flow instead.
-- `wrangler.toml` contains a D1 ID and `devnoder-storage` R2 binding; migrations, binding, authorization and data isolation still need deployment-time verification.
+The revised frontend has a coherent Srvel-endorsed identity, self-hosted fonts, meaningful public entry and Guide/About. Recommended HTML/CSS/classic-JS starter opens useful source immediately. Code owns Files; mobile uses a drawer to retain editing width. Workspace identity, browser-local storage and Backup are visible. More holds secondary tools. Settings opens the same accessible AI/model dialog; readiness precedes actions and technical limits are progressively disclosed.
 
-## What is implemented and live-browser verified
+A real CodeMirror lifecycle defect was repaired: opening an empty project's first buffer or resuming a starter now initializes the editor without requiring a panel remount. Unsupported templates and services state their requirements before selection. Remote preview/tunnels, paid billing, remote collaboration and nonexistent registry plugins are not offered as working actions.
 
-- Project files persist through create → edit → autosave → reload → reopen; the browser flow passed on desktop Chromium and Android-profile Chromium.
-- ZIP export flushes dirty buffers, preserves binary bytes, excludes `.git` and respects a 20,000-file/100 MiB cap. Production-browser tests inspected exported file contents.
-- A project preview assembles a bounded static snapshot with local CSS; its iframe uses a restrictive sandbox/CSP. External requests are blocked and module graphs, binary assets and multi-page links are not claimed to work.
-- The live model UI can search/select the pinned WebLLM catalog and register compatible public Hugging Face `owner/model` entries for Transformers.js ONNX text generation. A separate isolated browser against production downloaded `onnx-community/tiny-random-gpt2-ONNX`, loaded it and generated text. Its weights are intentionally random and the output was nonsense: this proves one small download/runtime path, not useful model quality or code assistance. The [model card][4] documents its Transformers.js `text-generation` use.
-- GitHub origin/token UI was tested against mocked `api.github.com` responses. Fine-grained PAT storage is encrypted in the device-bound browser vault, but actual credentialed clone/push/pull and conflict behavior have not been exercised.
+## Models
 
-## Runtime and model boundaries
+The selected Qwen 0.5B family declares `onnx-community/Qwen2.5-Coder-0.5B-Instruct` q8 for its WASM fallback. The old Xenova repository was not a valid public artifact path. Chat input/output, percentage-based progress and pipeline disposal are corrected; completed WASM output is not animated as pretend streaming.
 
-JavaScript/Python/PHP file commands run through named local/WASM adapters. This is not a general OS shell, native toolchain, npm package manager, Node project build system or arbitrary framework runner. The preview only supports a static subset.
+An isolated browser downloaded the real trained Qwen ONNX model and generated `function add(a, b) { return a + b; }`. Three isolated VM checks passed. A smaller trained instruction model downloaded but failed the useful-code prompt; download success alone is not model usefulness. These are not physical-device, broad-benchmark, all-WebGPU-model, arbitrary-GGUF or offline-persistence tests.
 
-“Any model” is not yet supported. Local use is limited to the pinned WebLLM registry or compatible public Transformers.js ONNX text-generation repositories. GGUF and arbitrary model formats are unsupported. The tiny random model smoke test does not prove a useful code model, larger-weight model, or inference on physical devices. WebGPU, browser storage eviction, offline behavior and cancellation vary by browser/device. A custom OpenAI-compatible endpoint talks to an already-running server; it does not download weights. Do not advertise model UI registration as broad model support.
+## Validation and quality
 
-## Build and checks
+Clean lockfile install and TypeScript/Vite build pass. Unit suite: 24 files / 148 tests. Browser suite: 14 desktop/Android-profile Chromium scenarios including starter edit/preview/ZIP/reload, direct Code creation, More focus, consolidated Settings/AI handoff, model registration and mocked GitHub token persistence. Emulation is not real Android hardware.
 
-A clean `npm ci` and production build passed before deployment. The 26.86 MB ONNX WASM file is gzipped to 6.32 MiB with a rewritten asset URL; Cloudflare Pages serves it decompressed to the browser using a scoped response header. The build generated 86 precache entries (17,614.55 KiB) and no individual asset exceeds 25 MiB.
+All Pages assets are below 25 MiB; compressed oversized WASM retains scoped headers. Root, Guide, About, robots and sitemap are emitted. Lint has zero errors and 237 inherited warnings. Coverage is a measured ~25.95% statements baseline, not 80% platform coverage. Full audit has four low build-time deepmerge/workbox/PWA-chain findings and no moderate/high/critical findings; a compatible Hono adapter fix was applied. No patched same-major deepmerge release was published, so a breaking downgrade to old PWA tooling was not forced.
 
-The unit suite passed **20 files / 135 tests** with **23.49% global line coverage**. ESLint exits 0 with **241 warnings**. The complete dependency audit reports **zero advisories**. Eight desktop/Android-profile production-browser tests passed against the live custom domain: first-project save/reload/ZIP, model catalog/HF registration, sandboxed project preview, and mocked GitHub-token persistence/disconnect. A separate isolated browser successfully downloaded and ran the tiny random ONNX model above. Android was emulated and no real GitHub credentials were used. All five PR checks (push/PR unit and E2E plus Cloudflare Pages) passed on commit `6a345c0`; verify the current head before merging.
+## Still external or unavailable
 
-## Remaining work before broad daily-use readiness
+The executor's partial health response is not a general sandbox. Local JS/Python/PHP file adapters are not an OS shell, npm installation or framework dev server. Real OAuth app settings, executor/D1/R2 bindings, billing, hosted endpoints, registry backends and collaboration transport require their own security and runtime acceptance. Encrypted GitHub PAT storage is tested with mocked API validation, not actual remote writes.
 
-1. Test useful compatible models, including a coding model, on physical target devices. The tiny random-model test proves only that a small public ONNX repository can download and run. Document supported ONNX/WebLLM formats and keep GGUF outside scope until a runtime exists.
-2. Configure and security-test executor/collaboration or keep those capabilities disabled; validate origin allowlists, authentication, project isolation, quotas, timeouts and cancellation before enabling remote execution.
-3. Exercise real fine-grained-token Git clone/push/pull and conflict handling on an authorized test repository. Verify OAuth only if it will be offered.
-4. Decide when to merge PR #3 into `develop` and later `main`. The current public Pages deployment is intentionally built from the draft repair branch, not from `main`; keep a tested rollback path.
-5. Add unit coverage, test physical Android, and reduce lint warnings. Expand framework/package preview only after choosing explicit supported targets.
+Free zone-level Bot Fight Mode can challenge automated requests to the custom hostname. No zone-wide protection downgrade or parent DNS change was made. Normal-browser acceptance and curl challenges must be reported separately. The Pages alias is a different origin with separate local files. No DevNoder Supabase client/project exists in the connected account; another product's ownership policies cannot safely be guessed or repaired from this frontend.
 
-## External platform references
-
-[1] [Cloudflare Pages response headers](https://developers.cloudflare.com/pages/configuration/headers/) — `_headers` rules apply to static asset responses and may set response headers.
-
-[2] [Cloudflare content compression](https://developers.cloudflare.com/speed/optimization/content/compression/) — supported gzip encoding and WebAssembly content types.
-
-[3] [Cloudflare Pages limits](https://developers.cloudflare.com/pages/platform/limits/) — the per-file deployment cap used in the build check.
-
-[4] [Hugging Face tiny-random-gpt2 ONNX model card](https://huggingface.co/onnx-community/tiny-random-gpt2-ONNX) — documents the Transformers.js `text-generation` pipeline used in the isolated smoke test.
+Remaining acceptance is in [TODO.md](../TODO.md); design conventions are in [product-design.md](product-design.md). Do not mark the whole platform ready because frontend tests pass.
