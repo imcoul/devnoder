@@ -53,7 +53,7 @@ export default defineConfig({
       manifest: {
         name: 'DevNoder',
         short_name: 'DevNoder',
-        description: 'Mobile-first offline IDE by Srvel',
+        description: 'Browser-local developer workspace by Srvel. Edit, preview and back up supported projects.',
         theme_color: '#0D1F1E',
         background_color: '#0D1F1E',
         display: 'standalone',

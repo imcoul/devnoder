@@ -32,6 +32,13 @@ function formatStorageBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GiB`;
 }
 
+function providerLabel(provider: ModelConfig['provider']): string {
+  if (provider === 'webllm') return 'WebLLM / WebGPU';
+  if (provider === 'transformers') return 'Transformers.js ONNX';
+  if (provider === 'openai-compatible') return 'OpenAI-compatible server';
+  return provider;
+}
+
 function ActionBlock({ action }: { action: BoltAction }) {
   const [applied, setApplied] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -57,7 +64,7 @@ function ActionBlock({ action }: { action: BoltAction }) {
   return (
     <div className="action-block">
       <div className="action-header">
-        <span className="action-type">{action.type === 'file' ? '📄' : '⌨'}</span>
+        <span className="action-type">{action.type === 'file' ? 'File' : 'Command'}</span>
         <span className="action-path">{action.filePath ?? 'shell'}</span>
         {action.type === 'file' && (
           <button className="action-apply" onClick={apply} disabled={applied || applying}>
@@ -76,7 +83,7 @@ function ToolCallBlock({ evt }: { evt: ToolCallEvent }) {
   return (
     <div className="tool-call-block">
       <div className="tool-call-head">
-        <span className="tool-call-icon">🛠</span>
+        <span className="tool-call-icon">Tool</span>
         <span className="tool-call-name">{evt.name}</span>
         <span className={`tool-call-status tool-call-status--${running ? 'running' : 'done'}`}>
           {running ? 'running…' : 'done'}
@@ -119,16 +126,16 @@ function MessageBubble({
           {!msg.rated && !msg.editing && (
             <>
               <button className="feedback-btn" onClick={() => onRate(msg.id, 'good')}
-                aria-label="Good response" title="Good response">👍</button>
+                aria-label="Good response" title="Good response">Good</button>
               <button className="feedback-btn" onClick={() => onRate(msg.id, 'bad')}
-                aria-label="Bad response" title="Bad response">👎</button>
+                aria-label="Bad response" title="Bad response">Needs work</button>
               <button className="feedback-btn" onClick={() => onRate(msg.id, 'edited')}
-                aria-label="Edit response" title="Edit to correct">✏️</button>
+                aria-label="Edit response" title="Edit to correct">Edit</button>
             </>
           )}
           {msg.rated && !msg.editing && (
             <span className="feedback-rated">
-              {msg.rated === 'good' ? '👍' : msg.rated === 'bad' ? '👎' : '✏️'} rated
+              {msg.rated === 'good' ? 'Good' : msg.rated === 'bad' ? 'Needs work' : 'Edited'} rated
             </span>
           )}
           {msg.editing && (
@@ -177,6 +184,7 @@ export default function AIPanel() {
   });
   const bottomRef  = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const settingsRef = useRef<HTMLDivElement>(null);
 
   const activeId     = useStore($activeBuffer);
   const buffers      = useStore($buffers);
@@ -184,6 +192,30 @@ export default function AIPanel() {
   const selectedModel = modelCatalog.find(m => m.id === modelId) ?? MODELS[0];
 
   useEffect(() => {
+    if (!showSettings || !settingsRef.current) return;
+    const modal = settingsRef.current;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusable = () => [...modal.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), a[href], [tabindex="0"]')].filter(element => element.getClientRects().length);
+    const frame = requestAnimationFrame(() => focusable()[0]?.focus());
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); setShowSettings(false); return; }
+      if (event.key !== 'Tab') return;
+      const elements = focusable();
+      const first = elements[0], last = elements.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => { cancelAnimationFrame(frame); document.removeEventListener('keydown', onKey); if (previous?.isConnected) previous.focus(); };
+  }, [showSettings]);
+
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem('devnoder-open-ai-settings') === '1') {
+        sessionStorage.removeItem('devnoder-open-ai-settings');
+        setShowSettings(true);
+      }
+    } catch { /* session storage can be unavailable in private browsing */ }
     void aiGateway.loadKeys().then(() => {
       const catalog = aiGateway.getModels();
       setModelCatalog(catalog);
@@ -255,9 +287,28 @@ export default function AIPanel() {
     localStorage.setItem('devnoder-selected-model', modelId);
   }, [modelId]);
 
+  const webgpuAvailable = typeof navigator !== 'undefined' && 'gpu' in navigator;
+  const modelRuntimeAvailable = webgpuAvailable || !!selectedModel.transformersModelId;
+  const selectedModelProgress = loadProgress?.modelId === modelId ? loadProgress : null;
+  const localModelIsLoaded = webLLMManager.isLoadedFor(modelId);
+  const setupState = aiGateway.getModelSetupState(selectedModel);
+  const canSend = selectedModel.offlineCapable ? localModelIsLoaded : setupState.configured;
+  const readinessMessage = selectedModel.offlineCapable
+    ? localModelIsLoaded
+      ? 'Ready in this tab'
+      : selectedModelProgress
+        ? 'Downloading model files…'
+        : 'Prepare this local model in the AI setup panel before sending.'
+    : setupState.reason;
+
   const send = useCallback(async () => {
     const text = input.trim();
     if (!text || streaming) return;
+    if (!canSend) {
+      setModelError(readinessMessage);
+      showToast({ type: 'info', message: readinessMessage });
+      return;
+    }
     setInput('');
 
     const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: text };
@@ -320,7 +371,7 @@ export default function AIPanel() {
         .then(m => m.audioCueService.cue('ai-done'))
         .catch(() => {});
     }
-  }, [input, streaming, agentId, modelId, messages, activeBuffer]);
+  }, [input, streaming, agentId, modelId, messages, activeBuffer, canSend, readinessMessage]);
 
   const handleRate = async (msgId: string, rating: 'good' | 'bad' | 'edited', edited?: string) => {
     const msg = messages.find(m => m.id === msgId);
@@ -462,32 +513,39 @@ export default function AIPanel() {
     }
   };
 
-  const webgpuAvailable = typeof navigator !== 'undefined' && 'gpu' in navigator;
-  const modelRuntimeAvailable = webgpuAvailable || !!selectedModel.transformersModelId;
-  const selectedModelProgress = loadProgress?.modelId === modelId ? loadProgress : null;
   const filteredPrebuiltModels = prebuiltModels
     .filter(model => model.id.toLowerCase().includes(prebuiltQuery.trim().toLowerCase()))
     .slice(0, 8);
-  const localModelIsLoaded = webLLMManager.isLoadedFor(modelId);
+  const localStatus = selectedModel.offlineCapable
+    ? selectedModelProgress
+      ? 'Downloading'
+      : localModelIsLoaded
+        ? 'Ready in this tab'
+        : cachedFiles === true
+          ? 'Requires setup'
+          : cachedFiles === false
+            ? 'Not set up'
+            : 'Checking setup…'
+    : setupState.configured ? 'Ready to use' : 'Requires setup';
 
   return (
     <div className="ai-panel">
       <div className="ai-header">
         <div className="agent-pills" role="group" aria-label="AI agent">
           {AGENTS.map(a => (
-            <button key={a.id} className={`agent-pill ${agentId === a.id ? 'active' : ''}`}
+              <button key={a.id} className={`agent-pill ${agentId === a.id ? 'active' : ''}`}
               onClick={() => setAgentId(a.id)} title={a.description}
-              aria-pressed={agentId === a.id} aria-label={`${a.label} agent — ${a.description}`}>{a.icon}</button>
+              aria-pressed={agentId === a.id} aria-label={`${a.label} agent — ${a.description}`}>{a.label}</button>
           ))}
         </div>
         <select className="model-select" aria-label="AI model" value={modelId} onChange={e => setModelId(e.target.value)}>
           {modelCatalog.map(m => (
             <option key={m.id} value={m.id}>
-              {m.label}{m.free ? ' ★' : ''}{m.id.startsWith('custom-') ? ' 🎯' : ''}
+              {m.label}{m.free ? ' · local/free' : ''}
             </option>
           ))}
         </select>
-        <button className="ai-settings-btn" onClick={() => setShowSettings(s => !s)} aria-label="AI provider and model settings">⚙</button>
+        <button className="ai-settings-btn" onClick={() => setShowSettings(s => !s)} aria-label="AI provider and model settings">AI settings</button>
       </div>
 
       {selectedModelProgress && (
@@ -498,11 +556,11 @@ export default function AIPanel() {
       )}
 
       <div className="ai-agent-label">
-        {AGENTS.find(a => a.id === agentId)?.icon} {AGENTS.find(a => a.id === agentId)?.label} Agent
+        {AGENTS.find(a => a.id === agentId)?.label} Agent
         <span className="ai-model-badge">{selectedModel.label}</span>
         {selectedModel.offlineCapable && (
           <span className="ai-offline-badge" title="On-device model. Prepare it explicitly below; the browser may evict cached weights.">
-            On-device model
+            Local weights
           </span>
         )}
       </div>
@@ -510,24 +568,9 @@ export default function AIPanel() {
       {selectedModel.offlineCapable && (
         <section className="ai-local-model-manager" aria-label="Local model download and cache">
           <div className="ai-local-model-status" role="status" aria-live="polite">
-            {localModelIsLoaded
-              ? 'Ready in this tab'
-              : cachedFiles === true
-                ? 'Cached model files found — load to verify they are complete'
-                : cachedFiles === false
-                  ? 'Model files are not cached; preparing will download them'
-                  : 'Checking local cache…'}
+            {localStatus} · {providerLabel(selectedModel.provider)}
           </div>
-          {selectedModel.vramRequiredMB !== undefined && (
-            <p className="ai-key-note">
-              WebLLM registry estimate: {Math.round(selectedModel.vramRequiredMB)} MiB GPU memory. This is a runtime-memory estimate, not the download size.
-            </p>
-          )}
-          {storageEstimate?.quota !== undefined && (
-            <p className="ai-key-note">
-              Browser origin storage: approximately {formatStorageBytes(storageEstimate.usage ?? 0)} used of {formatStorageBytes(storageEstimate.quota)}. The browser controls eviction; this figure is not a model-size estimate.
-            </p>
-          )}
+          <p className="ai-key-note">Model: <code>{selectedModel.id}</code>. Local weights stay in this browser and download only after you choose a preparation action.</p>
           {localModelIsLoaded ? (
             <button className="ai-clear-btn" onClick={unloadSelectedLocalModel} disabled={modelAction}>
               {modelAction ? 'Unloading…' : 'Unload from this tab'}
@@ -538,16 +581,29 @@ export default function AIPanel() {
               {modelAction ? 'Preparing model…' : cachedFiles ? 'Load model on this device' : 'Download & load model'}
             </button>
           )}
-          {!modelRuntimeAvailable && <p className="ai-key-note">This model needs WebGPU on this browser. The current browser exposes no WebGPU runtime and this model has no validated WASM fallback.</p>}
+          {!modelRuntimeAvailable && <p className="ai-key-note">This model needs WebGPU on this browser. The current browser exposes no WebGPU runtime and this model has no validated ONNX fallback.</p>}
           {modelError && <p className="ai-local-model-error" role="alert">{modelError}</p>}
           {(cachedFiles || localModelIsLoaded) && (
             <button className="ai-clear-btn" onClick={clearSelectedModelCache} disabled={modelAction}>
               Remove this model’s cached files
             </button>
           )}
-          <p className="ai-key-note">
-            Local models are limited to the pinned WebLLM registry or compatible Transformers.js ONNX repositories. Downloads may be large, require network access and cannot be reliably cancelled by this runtime. Browser storage is best-effort; offline use is not guaranteed.
-          </p>
+          <details className="ai-model-details">
+            <summary>Compatibility, download &amp; storage details</summary>
+          {selectedModel.vramRequiredMB !== undefined && (
+            <p className="ai-key-note">
+              WebLLM registry estimate: {Math.round(selectedModel.vramRequiredMB)} MiB GPU memory. This is a runtime-memory estimate, not the download size.
+            </p>
+          )}
+          {storageEstimate?.quota !== undefined && (
+            <p className="ai-key-note">
+              Browser origin storage: approximately {formatStorageBytes(storageEstimate.usage ?? 0)} used of {formatStorageBytes(storageEstimate.quota)}. The browser controls eviction; this figure is not a model-size estimate.
+            </p>
+          )}
+            <p className="ai-key-note">
+              Local models use the pinned WebLLM registry or compatible Transformers.js ONNX repositories. Downloads may be large and cannot be reliably cancelled. Browser storage is best-effort; offline use is not guaranteed. Hosted providers send prompts to their service and do not download weights here.
+            </p>
+          </details>
           <button className="ai-set-default-btn" onClick={() => setShowSettings(true)}>Browse supported local models</button>
         </section>
       )}
@@ -555,10 +611,12 @@ export default function AIPanel() {
       <div className="ai-messages">
         {messages.length === 0 && (
           <div className="ai-welcome">
-            <span className="ai-welcome-icon">🤖</span>
-            <p>Ask anything about your code</p>
+            <p className="ai-welcome-title">Ask anything about your code</p>
             <p className="ai-welcome-sub">Shift+Enter for new line · Enter to send</p>
-            <p className="ai-welcome-sub">Rate responses 👍👎✏️ to build training data</p>
+            <p className="ai-welcome-sub">Responses can be rated locally to improve your workflow.</p>
+            {selectedModel.offlineCapable && localModelIsLoaded && (
+              <button className="ai-suggestion-btn" onClick={() => setInput('In the current file, add a small accessible improvement and explain the change.')}>Try a harmless code prompt</button>
+            )}
           </div>
         )}
         {messages.map(msg => (
@@ -572,11 +630,12 @@ export default function AIPanel() {
         <textarea ref={textareaRef} className="ai-textarea" value={input}
           aria-label={`Message the ${AGENTS.find(a => a.id === agentId)?.label} agent`}
           onChange={e => setInput(e.target.value)} onKeyDown={onKeyDown}
-          placeholder={`Ask the ${AGENTS.find(a => a.id === agentId)?.label} agent…`}
+          placeholder={canSend ? `Ask the ${AGENTS.find(a => a.id === agentId)?.label} agent…` : readinessMessage}
+          disabled={!canSend && !streaming}
           rows={3} />
         {modelId === 'custom-openai-compatible' && (
           <div className="ai-custom-model-bar">
-            <span className="ai-custom-badge">Custom endpoint active</span>
+            <span className="ai-custom-badge">Configured model server</span>
             <span>Your prompts and code go directly to that server.</span>
           </div>
         )}
@@ -584,14 +643,14 @@ export default function AIPanel() {
           <button className="ai-clear-btn" onClick={() => setMessages([])}>Clear</button>
           {streaming
             ? <button className="ai-stop-btn" onClick={() => agentRunner.abort()}>Stop</button>
-            : <button className="ai-send-btn" onClick={send} disabled={!input.trim()}>Send ↑</button>
+            : <button className="ai-send-btn" onClick={send} disabled={!input.trim() || !canSend} title={!canSend ? readinessMessage : undefined}>Send</button>
           }
         </div>
       </div>
 
       {showSettings && (
         <div className="ai-settings-overlay" onClick={() => setShowSettings(false)}>
-          <div className="ai-settings-modal" onClick={e => e.stopPropagation()}>
+          <div ref={settingsRef} className="ai-settings-modal" role="dialog" aria-modal="true" aria-label="AI and model settings" onClick={e => e.stopPropagation()}>
             <div className="ai-settings-head">
               <span>AI and model settings</span>
               <button onClick={() => setShowSettings(false)} aria-label="Close">×</button>
@@ -610,7 +669,7 @@ export default function AIPanel() {
               </div>
             ))}
             <button className="ai-send-btn" onClick={saveKeys}>Save Keys</button>
-            <p className="ai-key-note">Keys stored locally — never sent to Srvel or anywhere except your chosen provider.</p>
+            <p className="ai-key-note">Keys are encrypted and stored locally, then sent only to the provider you select.</p>
 
             <section style={{ borderTop: '1px solid var(--color-border)', marginTop: '1rem', paddingTop: '1rem' }}>
               <h3 style={{ margin: '0 0 0.5rem' }}>Supported on-device model catalog</h3>

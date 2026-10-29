@@ -1,0 +1,52 @@
+.brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-inline-size: 0;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.brand-lockup__mark {
+  inline-size: 2rem;
+  block-size: 2rem;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+.brand-lockup__text {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  min-inline-size: 0;
+}
+
+.brand-lockup__name {
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.brand-lockup__byline {
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.brand-lockup:hover .brand-lockup__name,
+.brand-lockup:focus-visible .brand-lockup__name {
+  color: var(--color-turquoise);
+}
+
+.brand-lockup--compact .brand-lockup__mark {
+  inline-size: 1.65rem;
+  block-size: 1.65rem;
+}
+
+.brand-lockup--compact .brand-lockup__name {
+  font-size: 0.9rem;
+}

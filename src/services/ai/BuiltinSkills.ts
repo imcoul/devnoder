@@ -61,12 +61,12 @@ const BUILTINS: Skill[] = [
 --color-text: #f0f6fc
 --color-text-muted: #8b9ea0
 --color-turquoise: #40E0D0 (primary accent)
---color-yellow: #FFFF80 (secondary accent)
---color-purple: #800080 (tertiary accent)
+--color-yellow: #FFFF80 (genuine calls to action only)
+--color-purple: #d894d8 (legible secondary accent on dark surfaces)
 --color-error: #ef4444
 --color-success: #22c55e
---font-display: 'Comfortaa', sans-serif
---font-body: 'Quicksand', sans-serif
+--font-display: 'Instrument Sans', sans-serif
+--font-body: 'Livvic', sans-serif
 --font-code: 'JetBrains Mono', monospace
 --radius: 0.375rem
 --nav-height: 3.5rem
@@ -154,6 +154,11 @@ export async function seedBuiltinSkills(): Promise<void> {
     const existing = await skillStore.getBySource('builtin');
     const found = existing.find(s => s.id === skill.id);
     if (!found) await skillStore.save(skill);
+    else if (skill.id === 'builtin-srvel-brand' && /Comfortaa|Quicksand/.test(found.systemPromptPrefix)) {
+      await skillStore.save({ ...found, systemPromptPrefix: found.systemPromptPrefix
+        .replace(/'Comfortaa'/g, "'Instrument Sans'")
+        .replace(/'Quicksand'/g, "'Livvic'") });
+    }
   }
 }
 

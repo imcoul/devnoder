@@ -7,25 +7,25 @@
   --color-text-muted:    #8b9ea0;
   --color-turquoise:     #40E0D0;
   --color-yellow:        #FFFF80;
-  --color-purple:        #800080;
+  --color-purple:        #c8b4ff;
   --color-error:         #ef4444;
   --color-warn:          #f59e0b;
   --color-success:       #22c55e;
-  --font-display:        'Comfortaa', sans-serif;
-  --font-body:           'Quicksand', sans-serif;
-  --font-code:           'JetBrains Mono', monospace;
+  --font-display:        'Instrument Sans', system-ui, sans-serif;
+  --font-body:           'Livvic', system-ui, sans-serif;
+  --font-code:           'JetBrains Mono', ui-monospace, monospace;
   --radius:              0.375rem;
   --nav-height:          3.5rem;
 }
 [data-theme="light"] {
   --color-canvas:#f8fafc; --color-surface:#ffffff; --color-surface-hover:#f1f5f9;
   --color-border:#e2e8f0; --color-text:#0f172a; --color-text-muted:#64748b;
-  --color-turquoise:#0891b2; --color-yellow:#d97706; --color-purple:#7c3aed;
+  --color-turquoise:#0891b2; --color-yellow:#d97706; --color-purple:#6d4acb;
 }
 [data-theme="protanopia"] {
   --color-canvas:#0D1F1E; --color-surface:#162A28; --color-border:#2a3f3d;
   --color-text:#f0f6fc; --color-text-muted:#8b9ea0;
-  --color-turquoise:#60a5fa; --color-yellow:#fcd34d; --color-purple:#818cf8;
+  --color-turquoise:#60a5fa; --color-yellow:#fcd34d; --color-purple:#c4b5fd;
   --color-error:#fbbf24; --color-success:#60a5fa;
 }
 [data-theme="deuteranopia"] {
@@ -43,7 +43,7 @@
 [data-theme="hc-aaa"] {
   --color-canvas:#000000; --color-surface:#0a0a0a; --color-surface-hover:#1a1a1a;
   --color-border:#ffffff; --color-text:#ffffff; --color-text-muted:#cccccc;
-  --color-turquoise:#00ffff; --color-yellow:#ffff00; --color-purple:#ff00ff;
+  --color-turquoise:#00ffff; --color-yellow:#ffff00; --color-purple:#ffbfff;
   --color-error:#ff4444; --color-success:#00ff00;
 }
 [data-theme="hc-light"] {
@@ -55,15 +55,14 @@
 [data-theme="grayscale"] {
   --color-canvas:#111111; --color-surface:#1e1e1e; --color-surface-hover:#2a2a2a;
   --color-border:#444444; --color-text:#eeeeee; --color-text-muted:#888888;
-  --color-turquoise:#cccccc; --color-yellow:#aaaaaa; --color-purple:#999999;
+  --color-turquoise:#cccccc; --color-yellow:#aaaaaa; --color-purple:#bbbbbb;
   --color-error:#bbbbbb; --color-success:#dddddd;
 }
 
-/* ── Srvel brand aliases (canonical names used by all Sprint 0-10 components) ── */
 :root, [data-theme="default"] {
   --srvel-turquoise:    #40E0D0;
   --srvel-yellow:       #FFFF80;
-  --srvel-purple:       #800080;
+  --srvel-purple:       #c8b4ff;
   --color-primary:      var(--color-turquoise);
   --color-primary-hover:#33bdb0;
   --color-accent:       var(--color-yellow);

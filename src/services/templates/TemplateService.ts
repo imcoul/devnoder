@@ -2,6 +2,8 @@
 import Dexie, { Table } from 'dexie';
 import { EXECUTOR_BASE_URL } from '../../config/serviceEndpoints';
 
+export type TemplateCapability = 'browser-static' | 'scaffold' | 'external-runtime';
+
 export interface Template {
   id: string;
   name: string;
@@ -12,6 +14,9 @@ export interface Template {
   commands: string[];   // setup commands to show user (run locally)
   dependencies: Record<string, string>;
   devDependencies: Record<string, string>;
+  /** Optional so community and older templates remain source-compatible. */
+  capability?: TemplateCapability;
+  runtimeNote?: string;
 }
 
 export interface TemplateFile {
@@ -27,6 +32,8 @@ const TEMPLATES: Template[] = [
     id: 'react-vite-ts',
     name: 'React + Vite + TypeScript',
     description: 'Modern React app with Vite, TypeScript, and CSS modules',
+    capability: 'scaffold',
+    runtimeNote: 'Scaffold only: install dependencies and run the Vite build outside DevNoder.',
     icon: '⚛️',
     tags: ['react', 'vite', 'typescript', 'web'],
     commands: ['npm install', 'npm run dev'],
@@ -106,6 +113,8 @@ body { background: #0d1117; color: #f0f6fc; }` },
     id: 'nextjs-15',
     name: 'Next.js 15',
     description: 'Full-stack React with App Router, TypeScript, and Tailwind CSS',
+    capability: 'external-runtime',
+    runtimeNote: 'Requires an external Node/Next.js environment; DevNoder does not run this framework build here.',
     icon: '▲',
     tags: ['next', 'react', 'typescript', 'fullstack', 'tailwind'],
     commands: ['npm install', 'npm run dev'],
@@ -167,6 +176,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     id: 'flutter',
     name: 'Flutter App',
     description: 'Flutter starter with Material 3, Dart null safety',
+    capability: 'external-runtime',
+    runtimeNote: 'Requires the Flutter SDK and a device or desktop runtime outside DevNoder.',
     icon: '🐦',
     tags: ['flutter', 'dart', 'mobile', 'cross-platform'],
     commands: ['flutter pub get', 'flutter run'],
@@ -249,6 +260,8 @@ class _HomePageState extends State<HomePage> {
     id: 'node-express',
     name: 'Node.js + Express API',
     description: 'REST API with Express, TypeScript, and zod validation',
+    capability: 'external-runtime',
+    runtimeNote: 'Requires an external Node.js environment; the browser terminal does not install npm packages.',
     icon: '🟢',
     tags: ['node', 'express', 'api', 'typescript', 'backend'],
     commands: ['npm install', 'npm run dev'],
@@ -319,6 +332,8 @@ router.delete('/:id', (req, res) => {
     id: 'python-fastapi',
     name: 'Python FastAPI',
     description: 'Modern async API with FastAPI, Pydantic v2, and uvicorn',
+    capability: 'external-runtime',
+    runtimeNote: 'Requires an external Python environment with its dependencies installed.',
     icon: '🐍',
     tags: ['python', 'fastapi', 'api', 'async', 'backend'],
     commands: ['pip install fastapi uvicorn pydantic', 'uvicorn main:app --reload'],
@@ -376,6 +391,8 @@ def delete_item(item_id: int):
     id: 'vanilla',
     name: 'Vanilla HTML / CSS / JS',
     description: 'Zero-dependency starter, no build step needed',
+    capability: 'browser-static',
+    runtimeNote: 'Runs here: static HTML, CSS, classic JavaScript preview and export; no package install required.',
     icon: '🌐',
     tags: ['html', 'css', 'javascript', 'vanilla', 'beginner'],
     commands: ['open index.html', '# or: npx serve .'],
@@ -422,6 +439,8 @@ btn.addEventListener('click', () => {
     id: 'srvel-starter',
     name: 'Srvel Starter',
     description: 'DevNoder-branded PWA starter with Srvel theme, CSS tokens, and i18n scaffold',
+    capability: 'scaffold',
+    runtimeNote: 'Scaffold only: install dependencies and run the Vite/PWA build outside DevNoder.',
     icon: '🌊',
     tags: ['srvel', 'pwa', 'react', 'vite', 'typescript', 'i18n'],
     commands: ['npm install', 'npm run dev'],
@@ -445,8 +464,8 @@ btn.addEventListener('click', () => {
   --color-border:    #2a3f3d;
   --color-text:      #f0f6fc;
   --color-text-muted: #8b9ea0;
-  --font-display: 'Comfortaa', sans-serif;
-  --font-body:    'Quicksand', sans-serif;
+  --font-display: 'Instrument Sans', system-ui, sans-serif;
+  --font-body:    'Livvic', system-ui, sans-serif;
   --font-code:    'JetBrains Mono', monospace;
 }` },
       { path: 'src/main.tsx', content: `import React from 'react';
@@ -459,7 +478,7 @@ import './i18n';
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><App /></React.StrictMode>
 );` },
-      { path: 'src/styles/base.css', content: `@import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&family=Quicksand:wght@400;600&family=JetBrains+Mono&display=swap');
+      { path: 'src/styles/base.css', content: `/* Self-host Instrument Sans, Livvic and JetBrains Mono when available; system fallbacks keep the scaffold offline-safe. */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: var(--font-body); background: var(--color-canvas); color: var(--color-text); }` },
       { path: 'src/App.tsx', content: `import React from 'react';

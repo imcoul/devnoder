@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react'
-import { useStore } from '@nanostores/react'
+import { useState } from 'react'
 import {
-  $subscription, TIER_FEATURES, TIER_PRICES,
-  loadSubscription, startCheckout, openCustomerPortal,
-  isHosted,
+  TIER_FEATURES, TIER_PRICES,
+  startCheckout, openCustomerPortal,
 } from '../../services/cloud/CloudTier'
 import { showToast } from '../../stores/ui'
 import './BillingPanel.css'
+
+const BILLING_CONFIGURED = false
 
 function FeatureRow({ label, free, hosted, team }: { label: string; free: any; hosted: any; team: any }) {
   const fmt = (v: any) => v === true ? '✓' : v === false ? '—' : v
@@ -22,11 +22,8 @@ function FeatureRow({ label, free, hosted, team }: { label: string; free: any; h
 }
 
 export default function BillingPanel() {
-  const sub      = useStore($subscription)
   const [loading, setLoading] = useState<string | null>(null)
   const [seats,   setSeats]   = useState(1)
-
-  useEffect(() => { loadSubscription() }, [])
 
   const checkout = async (tier: 'hosted' | 'team') => {
     setLoading(tier)
@@ -49,23 +46,14 @@ export default function BillingPanel() {
       {/* Current plan */}
       <div className="billing-current">
         <div className="billing-current__info">
-          <span className="billing-current__tier">{sub.tier.charAt(0).toUpperCase() + sub.tier.slice(1)}</span>
-          {sub.status === 'active' && <span className="billing-current__badge billing-current__badge--active">Active</span>}
-          {sub.status === 'trialing' && <span className="billing-current__badge billing-current__badge--trial">Trial</span>}
-          {sub.status === 'past_due' && <span className="billing-current__badge billing-current__badge--warn">Past due</span>}
-          {sub.currentPeriodEnd && (
-            <span className="billing-current__date">Renews {sub.currentPeriodEnd.toLocaleDateString()}</span>
-          )}
+          <span className="billing-current__tier">Local-first core</span>
+          <span className="billing-current__badge billing-current__badge--trial">No subscription claim</span>
         </div>
-        {isHosted() && (
-          <button className="billing-manage-btn" onClick={portal} disabled={loading === 'portal'}>
-            {loading === 'portal' ? '…' : 'Manage Plan'}
-          </button>
-        )}
+        <span className="billing-current__date">Checkout and entitlements are not offered in this build.</span>
       </div>
 
       {/* Pricing cards */}
-      {!isHosted() && (
+      {BILLING_CONFIGURED && (
         <div className="billing-plans">
           {/* Free */}
           <div className="billing-plan billing-plan--current">
@@ -124,6 +112,13 @@ export default function BillingPanel() {
         </div>
       )}
 
+      {!BILLING_CONFIGURED && (
+        <div className="billing-unavailable" role="status">
+          <strong>Billing is not configured</strong>
+          <p>No verified checkout, customer portal, or paid-license service is connected to this deployment. Your browser-local DevNoder core remains available without a subscription claim.</p>
+        </div>
+      )}
+
       {/* Feature comparison */}
       <div className="billing-features">
         <div className="billing-feat billing-feat--header">
@@ -139,9 +134,8 @@ export default function BillingPanel() {
 
       {/* AGPL note */}
       <p className="billing-agpl-note">
-        DevNoder is AGPL-3.0. The core will always be free and open source.
-        Paid plans fund development and infrastructure. {' '}
-        <a href="https://github.com/srvel-build/devnoder" target="_blank" rel="noopener noreferrer">View source →</a>
+        DevNoder is AGPL-3.0. This comparison describes planned product tiers only; it does not grant paid entitlements. {' '}
+        <a href="https://github.com/imcoul/devnoder" target="_blank" rel="noopener noreferrer">View source →</a>
       </p>
     </div>
   )

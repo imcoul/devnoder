@@ -163,8 +163,8 @@ export default function CommunityPanel() {
                 <div className="plugin-desc">{p.description}</div>
                 <div className="plugin-perms">{p.permissions.join(', ')}</div>
               </div>
-              <button className="install-btn" onClick={() => installPlugin(p.id)} disabled={loading}>
-                Install
+              <button className="install-btn" onClick={() => installPlugin(p.id)} disabled={loading || !p.entryUrl}>
+                {p.entryUrl ? 'Install' : 'Not configured'}
               </button>
             </div>
           ))}

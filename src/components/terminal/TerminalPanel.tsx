@@ -33,7 +33,7 @@ function disposePane(pane: Pane) {
 }
 
 export default function TerminalPanel() {
-  const [tabs, setTabs] = useState<Tab[]>(() => [{ id: crypto.randomUUID(), label: 'Shell 1' }]);
+  const [tabs, setTabs] = useState<Tab[]>(() => [{ id: crypto.randomUUID(), label: 'Local runtime 1' }]);
   const [activeTab, setActiveTab] = useState<string>(() => tabs[0].id);
   const [panes, setPanes] = useState<Pane[]>(() => [createPane(tabs[0].id)]);
   const [activePane, setActivePane] = useState<string>(() => panes[0].id);
@@ -83,7 +83,7 @@ export default function TerminalPanel() {
 
   const addTab = () => {
     const tabId = crypto.randomUUID();
-    const tab: Tab = { id: tabId, label: `Shell ${tabs.length + 1}` };
+    const tab: Tab = { id: tabId, label: `Local runtime ${tabs.length + 1}` };
     const pane = createPane(tabId);
     setTabs(t => [...t, tab]);
     setPanes(p => [...p, pane]);
@@ -150,6 +150,9 @@ export default function TerminalPanel() {
 
   return (
     <div className="terminal-panel" onClick={() => inputRef.current?.focus()}>
+      <div className="terminal-capability-note" role="status">
+        Local runtimes: JavaScript, Python and PHP. This is not a full shell; npm packages and native toolchains are unavailable here.
+      </div>
       {/* Tab bar */}
       <div className="terminal-tabs">
         {tabs.map(tab => (
@@ -174,7 +177,7 @@ export default function TerminalPanel() {
             onClick={() => setActivePane(pane.id)}
           >
             <div className="terminal-pane-header">
-              <span>{pane.session.constructor.name}</span>
+              <span>Local JS / Python / PHP</span>
               {currentTabPanes.length > 1 && (
                 <button className="terminal-pane-close"
                   onClick={e => { e.stopPropagation(); closePane(pane.id); }}>×</button>
@@ -194,12 +197,12 @@ export default function TerminalPanel() {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Enter command… (Ctrl+E/O to split)"
+          placeholder="Run a supported local command… (Ctrl+E/O to split)"
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}
         />
-        <button className="terminal-run-btn" onClick={submit}>▶</button>
+        <button className="terminal-run-btn" onClick={submit}>Run</button>
       </div>
     </div>
   );

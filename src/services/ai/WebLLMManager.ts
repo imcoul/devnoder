@@ -4,6 +4,8 @@ import type { MCPTool } from './MCPConfigStore';
 
 type StreamHandler = (chunk: StreamChunk) => void;
 
+export type LocalModelPreparationState = 'not-prepared' | 'downloading' | 'ready-in-tab';
+
 class WebLLMManager {
   private engine: any = null;
   private currentModelId = '';
@@ -19,6 +21,12 @@ class WebLLMManager {
     return () => { this.onProgressCbs.delete(cb); };
   }
   getProgress() { return this.loadingProgress; }
+
+  getPreparationState(modelId: string): LocalModelPreparationState {
+    if (this.currentModelId === modelId && (this.engine || this.tfPipeline)) return 'ready-in-tab';
+    if (this.loadingModelId === modelId && this.loadingPromise) return 'downloading';
+    return 'not-prepared';
+  }
 
   private emitProgress(p: number, label: string, modelId = this.loadingModelId || this.currentModelId) {
     this.loadingProgress = Math.max(0, Math.min(100, Number.isFinite(p) ? p : 0));
@@ -89,9 +97,11 @@ class WebLLMManager {
     const { pipeline } = await import('@huggingface/transformers');
     this.emitProgress(5, 'Downloading model files from Hugging Face…', modelId);
     const loadedPipeline = await pipeline('text-generation', model.transformersModelId, {
+      ...(model.transformersDtype ? { dtype: model.transformersDtype } : {}),
       progress_callback: (info: any) => {
         if (info.status === 'progress') {
-          const progress = Number.isFinite(info.progress) ? Math.round(5 + info.progress * 85) : 5;
+          // Transformers.js reports percentages (0..100), not fractions.
+          const progress = Number.isFinite(info.progress) ? Math.round(5 + info.progress * 0.85) : 5;
           const file = typeof info.file === 'string' ? info.file : 'model files';
           this.emitProgress(progress, `Downloading ${file}…`, modelId);
         } else if (info.status === 'done') {
@@ -199,10 +209,26 @@ class WebLLMManager {
       : messages;
 
     if (this.useTransformers && this.tfPipeline) {
-      const prompt = augmented.map(m => `${m.role}: ${m.content}`).join('\n') + '\nassistant:';
-      const result = await this.tfPipeline(prompt, { max_new_tokens: 512 });
-      const generated = result[0]?.generated_text ?? '';
-      const text = (generated.startsWith(prompt) ? generated.slice(prompt.length) : generated).trim();
+      const chat = augmented.map(m => ({ role: m.role, content: m.content }));
+      let result: any;
+      let rawPrompt = '';
+      if (signal?.aborted) { onChunk({ delta: '', done: true }); return; }
+      try {
+        result = await this.tfPipeline(chat, { max_new_tokens: 512, do_sample: false });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!/chat.?template|apply_chat_template/i.test(message)) throw error;
+        const prompt = augmented.map(m => `${m.role}: ${m.content}`).join('\n') + '\nassistant:';
+        rawPrompt = prompt;
+        result = await this.tfPipeline(prompt, { max_new_tokens: 512, do_sample: false });
+      }
+      const generated = result[0]?.generated_text;
+      const finalMessage = Array.isArray(generated) ? generated.at(-1) : generated;
+      const text = typeof finalMessage === 'string'
+        ? (rawPrompt && finalMessage.startsWith(rawPrompt) ? finalMessage.slice(rawPrompt.length) : finalMessage).trim()
+        : typeof finalMessage?.content === 'string'
+          ? finalMessage.content.trim()
+          : '';
 
       const toolCall = this.parseToolCall(text);
       if (toolCall && tools.length) {
@@ -210,12 +236,8 @@ class WebLLMManager {
         return;
       }
 
-      const words = text.split(' ');
-      for (const word of words) {
-        if (signal?.aborted) break;
-        onChunk({ delta: word + ' ', done: false });
-        await new Promise(r => setTimeout(r, 20));
-      }
+      // Return actual completed WASM output; do not simulate token streaming.
+      if (!signal?.aborted) onChunk({ delta: text, done: false });
       onChunk({ delta: '', done: true });
       return;
     }
@@ -269,6 +291,7 @@ class WebLLMManager {
   async unload(): Promise<void> {
     if (this.loadingPromise) throw new Error('Wait for the model loading operation to finish before unloading.');
     if (this.engine?.unload) await this.engine.unload();
+    if (this.tfPipeline?.dispose) await this.tfPipeline.dispose();
     this.engine = null;
     this.tfPipeline = null;
     this.currentModelId = '';

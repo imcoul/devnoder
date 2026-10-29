@@ -72,6 +72,7 @@ export default function CodeEditor() {
   }, []);
 
   const activeBuffer = buffers.find(b => b.id === activeId);
+  const hasActiveBuffer = Boolean(activeBuffer);
 
   // ── Init editor ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -115,8 +116,8 @@ export default function CodeEditor() {
 
     viewRef.current = new EditorView({ state, parent: editorRef.current });
 
-    return () => { viewRef.current?.destroy(); viewRef.current = null; };
-  }, [saveActiveFile]);
+    return () => { viewRef.current?.destroy(); viewRef.current = null; lastIdRef.current = null; };
+  }, [saveActiveFile, hasActiveBuffer]);
 
   // ── Swap buffer content ────────────────────────────────────────────────────
   useEffect(() => {
@@ -134,7 +135,9 @@ export default function CodeEditor() {
 
     // Swap language
     loadLanguage(activeBuffer.language as LangId).then(lang => {
-      view.dispatch({ effects: langCompartment.reconfigure(lang ? [lang] : []) });
+      if (viewRef.current === view && $activeBuffer.get() === activeId) {
+        view.dispatch({ effects: langCompartment.reconfigure(lang ? [lang] : []) });
+      }
     });
   }, [activeId, activeBuffer]);
 
@@ -228,9 +231,10 @@ export default function CodeEditor() {
         blockSize: '100%', flexDirection: 'column', gap: '0.5rem',
         color: 'var(--color-text-muted)', fontSize: '0.9rem',
       }}>
-        <span style={{ fontSize: '2rem' }}>💻</span>
+        <span style={{ fontFamily: 'var(--font-code)', fontSize: '2rem', color: 'var(--color-turquoise)' }} aria-hidden="true">&lt;/&gt;</span>
         <p>No file open</p>
-        <p style={{ fontSize: '0.75rem' }}>Open a file from the Git panel or create one</p>
+        <p style={{ fontSize: '0.85rem' }}>Open Files to choose a source file, or create your first one.</p>
+        <button type="button" onClick={() => window.dispatchEvent(new Event('devnoder:new-file'))} style={{ minHeight: 44, padding: '.65rem 1rem', background: 'var(--color-yellow)', color: '#0d1f1e', border: 0, borderRadius: 'var(--radius)', fontWeight: 700 }}>Create your first file</button>
       </div>
     );
   }
@@ -274,7 +278,7 @@ export default function CodeEditor() {
           <span role="status" style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem', opacity: 0.7 }}>Saved</span>
         )}
         <button type="button" onClick={saveActiveFile} aria-label="Save file (Ctrl or Command plus S)"
-          style={{ padding: '0.35rem 0.6rem', color: 'var(--color-primary)' }}>
+          style={{ minHeight: 44, padding: '0.35rem 0.6rem', color: 'var(--color-turquoise)', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)' }}>
           Save
         </button>
       </div>

@@ -15,13 +15,15 @@ export interface ModelConfig {
   supportsTools?: boolean;
   /** Exact Hugging Face model used when this selection has a supported WASM path. */
   transformersModelId?: string;
+  /** Optional Transformers.js dtype verified for the declared repository. */
+  transformersDtype?: 'q4' | 'q8';
   /** Runtime-published VRAM estimate in MiB; not a model download-size estimate. */
   vramRequiredMB?: number;
   lowResourceRequired?: boolean;
 }
 
 export const MODELS: ModelConfig[] = [
-  { id: 'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC', label: 'Qwen 0.5B (local)',      provider: 'webllm',    contextWindow: 32768,  free: true,  offlineCapable: true,  supportsTools: true, transformersModelId: 'Xenova/Qwen2.5-Coder-0.5B-Instruct', vramRequiredMB: 944.62, lowResourceRequired: true },
+  { id: 'Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC', label: 'Qwen 0.5B (local)',      provider: 'webllm',    contextWindow: 32768,  free: true,  offlineCapable: true,  supportsTools: true, transformersModelId: 'onnx-community/Qwen2.5-Coder-0.5B-Instruct', transformersDtype: 'q8', vramRequiredMB: 944.62, lowResourceRequired: true },
   { id: 'Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC', label: 'Qwen 1.5B (WebGPU)',     provider: 'webllm',    contextWindow: 32768,  free: true,  offlineCapable: true,  supportsTools: true, vramRequiredMB: 1629.75, lowResourceRequired: false },
   { id: 'Phi-3.5-mini-instruct-q4f16_1-MLC',        label: 'Phi 3.5 Mini (local)',   provider: 'webllm',    contextWindow: 128000, free: true,  offlineCapable: true,  supportsTools: false, vramRequiredMB: 3672.07, lowResourceRequired: false },
   { id: 'llama-3.1-8b-instant',                     label: 'Llama 3.1 8B (Groq)',    provider: 'groq',      contextWindow: 131072, free: true,  offlineCapable: false, supportsTools: true  },
@@ -48,6 +50,12 @@ export interface OpenAICompatibleSettings {
   model: string;
   label: string;
   hasApiKey: boolean;
+}
+
+export interface ModelSetupState {
+  kind: 'local' | 'hosted';
+  configured: boolean;
+  reason: string;
 }
 
 interface CustomEndpoint {
@@ -155,6 +163,7 @@ class AIGateway {
       label: model.label,
       provider: model.provider === 'transformers' ? 'transformers' : 'webllm',
       transformersModelId: model.transformersModelId,
+      transformersDtype: model.transformersDtype,
       vramRequiredMB: model.vramRequiredMB,
       lowResourceRequired: model.lowResourceRequired,
     })));
@@ -179,6 +188,7 @@ class AIGateway {
       offlineCapable: true,
       supportsTools: false,
       transformersModelId: id,
+      transformersDtype: 'q8',
     };
     this.addedLocalModels = [...this.addedLocalModels, added];
     writeSavedLocalModels(this.addedLocalModels.map(model => ({
@@ -186,6 +196,7 @@ class AIGateway {
       label: model.label,
       provider: model.provider === 'transformers' ? 'transformers' : 'webllm',
       transformersModelId: model.transformersModelId,
+      transformersDtype: model.transformersDtype,
       vramRequiredMB: model.vramRequiredMB,
       lowResourceRequired: model.lowResourceRequired,
     })));
@@ -202,6 +213,7 @@ class AIGateway {
       label: model.label,
       provider: model.provider === 'transformers' ? 'transformers' : 'webllm',
       transformersModelId: model.transformersModelId,
+      transformersDtype: model.transformersDtype,
       vramRequiredMB: model.vramRequiredMB,
       lowResourceRequired: model.lowResourceRequired,
     })));
@@ -209,6 +221,44 @@ class AIGateway {
   }
 
   getModel() { return this.getModels().find(m => m.id === this.modelId) ?? MODELS[0]; }
+
+  hasProviderKey(provider: Provider): boolean {
+    return Boolean(this.keys[provider]);
+  }
+
+  getModelSetupState(model: ModelConfig = this.getModel()): ModelSetupState {
+    if (model.offlineCapable) {
+      return {
+        kind: 'local',
+        configured: true,
+        reason: 'Prepare the model in this tab before sending a prompt.',
+      };
+    }
+
+    if (model.provider === 'openai-compatible') {
+      const endpoint = this.getCustomEndpointSettings();
+      const localEndpoint = endpoint?.baseUrl.startsWith('http://localhost') || endpoint?.baseUrl.startsWith('http://127.0.0.1');
+      const configured = Boolean(endpoint && (endpoint.hasApiKey || localEndpoint));
+      return {
+        kind: 'hosted',
+        configured,
+        reason: endpoint
+          ? localEndpoint || endpoint.hasApiKey
+            ? 'Ready to use the configured model server.'
+            : 'Add the server API key before sending a prompt.'
+          : 'Configure the trusted model server in AI settings before sending a prompt.',
+      };
+    }
+
+    const configured = this.hasProviderKey(model.provider);
+    return {
+      kind: 'hosted',
+      configured,
+      reason: configured
+        ? 'Ready to send through the selected provider.'
+        : `Add the ${model.provider} API key in AI settings before sending a prompt.`,
+    };
+  }
 
   getCustomEndpointSettings(): OpenAICompatibleSettings | null {
     if (!this.customEndpoint) return null;
@@ -280,6 +330,7 @@ class AIGateway {
         offlineCapable: true,
         supportsTools: model.provider === 'transformers' ? false : undefined,
         transformersModelId: model.transformersModelId,
+        transformersDtype: model.transformersDtype ?? (model.provider === 'transformers' ? 'q8' : undefined),
         vramRequiredMB: model.vramRequiredMB,
         lowResourceRequired: model.lowResourceRequired,
       }));

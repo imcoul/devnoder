@@ -1,11 +1,11 @@
 .ai-panel { display:flex; flex-direction:column; block-size:100%; background:var(--color-canvas); color:var(--color-text); font-size:0.85rem; }
-.ai-header { display:flex; align-items:center; gap:0.4rem; padding:0.4rem 0.5rem; background:var(--color-surface); border-block-end:1px solid var(--color-border); flex-shrink:0; }
-.agent-pills { display:flex; gap:0.2rem; }
-.agent-pill { inline-size:2rem; block-size:2rem; border:1px solid var(--color-border); border-radius:50%; background:none; cursor:pointer; font-size:0.9rem; display:grid; place-items:center; }
+.ai-header { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:0.4rem; padding:0.4rem 0.5rem; background:var(--color-surface); border-block-end:1px solid var(--color-border); flex-shrink:0; }
+.agent-pills { grid-column:1 / -1; display:flex; gap:0.25rem; max-inline-size:100%; overflow-x:auto; }
+.agent-pill { flex-shrink:0; min-inline-size:2rem; min-block-size:44px; padding-inline:0.6rem; border:1px solid var(--color-border); border-radius:0.35rem; background:none; color:var(--color-text); cursor:pointer; font-size:0.78rem; display:grid; place-items:center; }
 .agent-pill.active { border-color:var(--color-turquoise); background:#40E0D015; }
 .agent-pill:hover:not(.active) { border-color:var(--color-text-muted); }
-.model-select { flex:1; padding:0.25rem 0.4rem; border:1px solid var(--color-border); border-radius:0.25rem; background:var(--color-surface); color:var(--color-text); font-size:0.75rem; cursor:pointer; }
-.ai-settings-btn { padding:0.25rem 0.5rem; border:1px solid var(--color-border); border-radius:0.25rem; background:none; color:var(--color-text-muted); cursor:pointer; }
+.model-select { min-inline-size:0; inline-size:100%; min-block-size:44px; padding:0.25rem 0.4rem; border:1px solid var(--color-border); border-radius:0.25rem; background:var(--color-surface); color:var(--color-text); font-size:0.78rem; cursor:pointer; }
+.ai-settings-btn { min-block-size:44px; padding:0.25rem 0.5rem; border:1px solid var(--color-border); border-radius:0.25rem; background:none; color:var(--color-text); cursor:pointer; }
 .ai-load-progress { display:flex; flex-direction:column; gap:0.25rem; padding:0.3rem 0.6rem; background:#40E0D015; color:var(--color-turquoise); font-size:0.72rem; text-align:center; flex-shrink:0; }
 .ai-load-progress progress { inline-size:100%; block-size:0.35rem; accent-color:var(--color-turquoise); }
 .ai-agent-label { display:flex; align-items:center; gap:0.4rem; padding:0.3rem 0.6rem; font-size:0.72rem; color:var(--color-text-muted); background:var(--color-surface); border-block-end:1px solid var(--color-border); flex-shrink:0; }
@@ -33,6 +33,7 @@
 @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-5px)} }
 .ai-input-area { border-block-start:1px solid var(--color-border); background:var(--color-surface); padding:0.5rem; flex-shrink:0; }
 .ai-textarea { inline-size:100%; padding:0.4rem 0.5rem; border:1px solid var(--color-border); border-radius:0.35rem; background:var(--color-canvas); color:var(--color-text); font-family:var(--font-body); font-size:0.83rem; resize:none; outline:none; line-height:1.5; }
+.ai-textarea:disabled { opacity:0.6; cursor:not-allowed; }
 .ai-textarea:focus { border-color:var(--color-turquoise); }
 .ai-input-actions { display:flex; justify-content:flex-end; gap:0.4rem; margin-block-start:0.3rem; }
 .ai-clear-btn { padding:0.3rem 0.6rem; border:1px solid var(--color-border); border-radius:0.25rem; background:none; color:var(--color-text-muted); cursor:pointer; font-size:0.78rem; }
@@ -62,7 +63,7 @@
 
 /* ── Feedback buttons (Sprint 11) ── */
 .msg-feedback { display:flex; align-items:center; gap:0.3rem; margin-block-start:0.4rem; padding-block-start:0.4rem; border-block-start:1px solid var(--color-border); }
-.feedback-btn { background:none; border:1px solid var(--color-border); border-radius:0.25rem; cursor:pointer; font-size:0.85rem; padding:0.1rem 0.35rem; line-height:1; transition:border-color 0.15s; }
+.feedback-btn { background:none; border:1px solid var(--color-border); border-radius:0.25rem; cursor:pointer; font-size:0.7rem; padding:0.15rem 0.4rem; line-height:1; transition:border-color 0.15s; }
 .feedback-btn:hover { border-color:var(--color-turquoise); }
 .feedback-rated { font-size:0.72rem; color:var(--color-text-muted); }
 .feedback-edit-area { inline-size:100%; display:flex; flex-direction:column; gap:0.3rem; }
@@ -89,3 +90,14 @@
 .ai-set-default-btn { padding:0.15rem 0.5rem; border:1px solid var(--color-turquoise); border-radius:0.2rem; background:none; color:var(--color-turquoise); cursor:pointer; font-size:0.7rem; }
 .ai-set-default-btn:hover { background:#40E0D020; }
 .ai-clear-default-btn { padding:0.15rem 0.5rem; border:1px solid var(--color-border); border-radius:0.2rem; background:none; color:var(--color-text-muted); cursor:pointer; font-size:0.7rem; }
+.ai-welcome-title { font-weight:700; color:var(--color-text); }
+.ai-suggestion-btn { padding:0.35rem 0.6rem; border:1px solid var(--color-yellow); border-radius:0.25rem; background:none; color:var(--color-yellow); cursor:pointer; font-size:0.72rem; }
+.ai-suggestion-btn:hover { background:#ffff8015; }
+.ai-key-note code { font-family:var(--font-code); color:var(--color-text); }
+
+/* Model setup uses progressive disclosure and comfortable touch targets. */
+.ai-local-model-manager .ai-key-note { font-size: .78rem; line-height: 1.5; }
+.ai-local-model-manager button { min-block-size: 44px; }
+.ai-model-details { color: var(--color-text-muted); font-size: .78rem; }
+.ai-model-details summary { min-block-size: 44px; display: flex; align-items: center; cursor: pointer; color: var(--color-turquoise); }
+.ai-settings-modal input { min-block-size: 44px; }

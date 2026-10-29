@@ -10,6 +10,7 @@ export interface SavedLocalModel {
   label: string;
   provider?: 'webllm' | 'transformers';
   transformersModelId?: string;
+  transformersDtype?: 'q4' | 'q8';
   vramRequiredMB?: number;
   lowResourceRequired?: boolean;
 }
@@ -56,6 +57,9 @@ export function readSavedLocalModels(): SavedLocalModel[] {
         (typeof (item as SavedLocalModel).transformersModelId === 'string' &&
           isValidTransformersRepoId((item as SavedLocalModel).transformersModelId!) &&
           (item as SavedLocalModel).id === `transformers:${(item as SavedLocalModel).transformersModelId}`)) &&
+      ((item as SavedLocalModel).transformersDtype === undefined ||
+        (item as SavedLocalModel).transformersDtype === 'q4' ||
+        (item as SavedLocalModel).transformersDtype === 'q8') &&
       ((item as SavedLocalModel).vramRequiredMB === undefined ||
         (typeof (item as SavedLocalModel).vramRequiredMB === 'number' &&
           Number.isFinite((item as SavedLocalModel).vramRequiredMB))) &&

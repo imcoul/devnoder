@@ -51,7 +51,7 @@ const REGISTRY_PLUGINS: Omit<Plugin, 'enabled' | 'installedAt' | 'source'>[] = [
     description: 'Format code with Prettier on save',
     author: 'Srvel',
     icon: '✨',
-    entryUrl: 'https://plugins.devnoder.srvel.io/prettier/index.js',
+    entryUrl: '', // planned registry entry; no verified artifact is hosted
     permissions: ['read:files', 'write:files'],
   },
   {
@@ -61,7 +61,7 @@ const REGISTRY_PLUGINS: Omit<Plugin, 'enabled' | 'installedAt' | 'source'>[] = [
     description: 'Show ESLint errors inline in the editor',
     author: 'Srvel',
     icon: '🔍',
-    entryUrl: 'https://plugins.devnoder.srvel.io/eslint/index.js',
+    entryUrl: '', // planned registry entry; no verified artifact is hosted
     permissions: ['read:files'],
   },
   {
@@ -71,7 +71,7 @@ const REGISTRY_PLUGINS: Omit<Plugin, 'enabled' | 'installedAt' | 'source'>[] = [
     description: 'Expand Emmet abbreviations in HTML/CSS',
     author: 'Srvel',
     icon: '⚡',
-    entryUrl: 'https://plugins.devnoder.srvel.io/emmet/index.js',
+    entryUrl: '', // planned registry entry; no verified artifact is hosted
     permissions: ['read:files', 'write:files'],
   },
   {
@@ -81,7 +81,7 @@ const REGISTRY_PLUGINS: Omit<Plugin, 'enabled' | 'installedAt' | 'source'>[] = [
     description: 'Collect and display all TODOs across files',
     author: 'Srvel',
     icon: '📋',
-    entryUrl: 'https://plugins.devnoder.srvel.io/todo-tree/index.js',
+    entryUrl: '', // planned registry entry; no verified artifact is hosted
     permissions: ['read:files', 'ui:panel'],
   },
 ];
@@ -91,7 +91,10 @@ class PluginAPI {
   private pendingRequests = new Map<string, { resolve: (v: any) => void; reject: (e: any) => void }>();
 
   async getInstalled(): Promise<Plugin[]> {
-    return db.plugins.orderBy('installedAt').reverse().toArray();
+    const installed = await db.plugins.orderBy('installedAt').reverse().toArray();
+    return installed.map(plugin => REGISTRY_PLUGINS.some(def => def.id === plugin.id && !def.entryUrl)
+      ? { ...plugin, entryUrl: '', enabled: false, description: 'Not configured — this built-in registry item has no hosted artifact.' }
+      : plugin);
   }
 
   async getRegistry(): Promise<typeof REGISTRY_PLUGINS> {
@@ -101,6 +104,7 @@ class PluginAPI {
   async install(registryId: string): Promise<Plugin> {
     const def = REGISTRY_PLUGINS.find(p => p.id === registryId);
     if (!def) throw new Error(`Plugin ${registryId} not found in registry`);
+    if (!def.entryUrl) throw new Error('This registry plugin is not configured; no verified plugin artifact is available.');
     const plugin: Plugin = { ...def, enabled: true, installedAt: Date.now(), source: 'registry' };
     await db.plugins.put(plugin);
     return plugin;
@@ -130,6 +134,9 @@ class PluginAPI {
 
   /** Load plugin in sandboxed iframe */
   async activate(plugin: Plugin): Promise<void> {
+    if (!plugin.entryUrl || REGISTRY_PLUGINS.some(def => def.id === plugin.id && !def.entryUrl)) {
+      throw new Error('This registry plugin is not configured.');
+    }
     if (this.sandboxes.has(plugin.id)) return;
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
@@ -140,6 +147,7 @@ class PluginAPI {
 
     // Message bridge
     window.addEventListener('message', (e: MessageEvent) => {
+      if (e.source !== iframe.contentWindow) return;
       const msg = e.data as PluginMessage;
       if (!msg?.pluginId || msg.pluginId !== plugin.id) return;
       this.handlePluginMessage(plugin, msg);

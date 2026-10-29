@@ -8,6 +8,9 @@ import './PreviewPanel.css';
 
 type Tab = 'preview' | 'share' | 'deploy' | 'logs';
 
+const REMOTE_PREVIEW_AVAILABLE = false;
+const REMOTE_PREVIEW_REASON = 'Cloud tunnel and deployment are not configured for this build. Use the local static preview and export instead.';
+
 function timeAgo(ts: number) {
   const s = Math.floor((Date.now() - ts) / 1000);
   if (s < 60) return `${s}s ago`;
@@ -114,10 +117,10 @@ export default function PreviewPanel() {
         {(['preview','share','deploy','logs'] as Tab[]).map(t => (
           <button key={t} className={`preview-tab ${tab === t ? 'active' : ''}`}
             onClick={() => setTab(t)}>
-            {t === 'preview' ? '👁 Preview'
-              : t === 'share' ? '🔗 Share'
-              : t === 'deploy' ? '🚀 Deploy'
-              : `📋 Logs${logs.length ? ` (${logs.length})` : ''}`}
+            {t === 'preview' ? 'Preview'
+              : t === 'share' ? 'Share'
+              : t === 'deploy' ? 'Deploy'
+              : `Logs${logs.length ? ` (${logs.length})` : ''}`}
           </button>
         ))}
       </div>
@@ -126,9 +129,10 @@ export default function PreviewPanel() {
       {tab === 'preview' && (
         <div className="preview-body">
           <div className="preview-toolbar">
-            <button className="preview-btn" onClick={() => void buildPreview()} disabled={previewBuilding}>
-              {previewBuilding ? 'Building…' : '↺ Refresh'}
+              <button className="preview-btn" onClick={() => void buildPreview()} disabled={previewBuilding}>
+              {previewBuilding ? 'Building…' : 'Refresh'}
             </button>
+            <span className="preview-capability-label">Static preview</span>
             {previewUrl && (
               <span className="preview-url-label">Project snapshot · {activeBuffer?.path ?? 'index.html'}</span>
             )}
@@ -144,7 +148,7 @@ export default function PreviewPanel() {
             ? <iframe className="preview-frame" src={previewUrl} title="Live preview"
                 sandbox="allow-scripts" />
             : <div className="preview-empty">
-                <span>👁</span><p>{previewMessage ?? 'Create or open an HTML file to preview this project'}</p>
+                <p>{previewMessage ?? 'Create or open an HTML file to preview this project'}</p>
               </div>
           }
         </div>
@@ -153,10 +157,11 @@ export default function PreviewPanel() {
       {/* Share */}
       {tab === 'share' && (
         <div className="preview-body preview-share">
-          <p className="share-desc">Open a tunnel to share your local dev server from Termux or anywhere running on port 5173.</p>
-          <button className="preview-action-btn" onClick={openTunnel} disabled={tunneling || tunnel?.active}>
-            {tunneling ? 'Opening tunnel…' : tunnel?.active ? '✅ Tunnel active' : '⚡ Open Tunnel'}
+          <p className="share-desc">Local static preview is available in this tab. A public tunnel is not enabled until the executor service is configured.</p>
+          <button className="preview-action-btn" onClick={openTunnel} disabled={!REMOTE_PREVIEW_AVAILABLE || tunneling || tunnel?.active}>
+            {tunneling ? 'Opening tunnel…' : tunnel?.active ? 'Tunnel active' : 'Open tunnel'}
           </button>
+          {!REMOTE_PREVIEW_AVAILABLE && <p className="preview-unavailable" role="status">{REMOTE_PREVIEW_REASON}</p>}
           {tunnel?.active && tunnel.url && (
             <>
               <a className="share-url" href={tunnel.url} target="_blank" rel="noopener noreferrer">{tunnel.url}</a>
@@ -175,10 +180,11 @@ export default function PreviewPanel() {
         <div className="preview-body preview-deploy">
           <div className="deploy-card">
             <h3>Deploy to Cloudflare Pages</h3>
-            <p>Deploys the current file via the executor Worker. For full builds, run <code>npm run build</code> + <code>wrangler pages deploy dist</code> locally.</p>
-            <button className="preview-action-btn" onClick={deploy} disabled={deploying || !activeBuffer}>
-              {deploying ? 'Deploying…' : '🚀 Deploy current file'}
+            <p>Local preview and export work here. Cloud deployment would require a configured executor and a supported build performed outside DevNoder.</p>
+            <button className="preview-action-btn" onClick={deploy} disabled={!REMOTE_PREVIEW_AVAILABLE || deploying || !activeBuffer}>
+              {deploying ? 'Deploying…' : 'Deploy project'}
             </button>
+            {!REMOTE_PREVIEW_AVAILABLE && <p className="preview-unavailable" role="status">{REMOTE_PREVIEW_REASON}</p>}
           </div>
           {history.length > 0 && (
             <div className="deploy-history">

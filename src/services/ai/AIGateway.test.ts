@@ -142,6 +142,22 @@ describe('AIGateway custom OpenAI-compatible endpoint', () => {
     expect(init.headers).not.toHaveProperty('Authorization');
   });
 
+  it('reports hosted providers as requiring setup until their key is configured', () => {
+    aiGateway.setModel('llama-3.1-8b-instant');
+    expect(aiGateway.getModelSetupState()).toMatchObject({ kind: 'hosted', configured: false });
+
+    aiGateway.setKey('groq', 'gsk_test');
+    expect(aiGateway.getModelSetupState()).toMatchObject({ kind: 'hosted', configured: true });
+  });
+
+  it('treats the pinned local model as configured but still requiring tab preparation', () => {
+    aiGateway.setModel(MODELS[0].id);
+    expect(aiGateway.getModelSetupState()).toMatchObject({
+      kind: 'local', configured: true,
+      reason: 'Prepare the model in this tab before sending a prompt.',
+    });
+  });
+
   it('adds only a pinned prebuilt local model and restores its exact catalog entry from browser storage', async () => {
     const model = await aiGateway.addPrebuiltLocalModel('org/approved-chat-model');
 

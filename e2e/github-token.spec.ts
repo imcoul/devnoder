@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { selectPanel } from './navigation';
 
 test('GitHub remote and encrypted token survive reload and disconnect cleanly', async ({ page }) => {
   await page.route('https://api.github.com/**', async route => {
@@ -20,8 +21,7 @@ test('GitHub remote and encrypted token survive reload and disconnect cleanly', 
   await page.getByLabel('Project name').fill('GitHub token acceptance');
   await page.getByRole('button', { name: 'Create project' }).click();
 
-  const navigation = page.getByRole('navigation', { name: 'Main navigation' });
-  await navigation.getByRole('button', { name: 'Git' }).click();
+  await selectPanel(page, 'Git');
   await page.getByLabel('HTTPS or SSH GitHub repository URL').fill('https://github.com/owner/repo.git');
   await page.getByRole('button', { name: 'Save origin' }).click();
   await expect(page.getByText('https://github.com/owner/repo.git')).toBeVisible();
@@ -34,7 +34,7 @@ test('GitHub remote and encrypted token survive reload and disconnect cleanly', 
   expect(await page.evaluate(() => localStorage.getItem('devnoder-gh-token'))).toBeNull();
 
   await page.reload();
-  await navigation.getByRole('button', { name: 'Git' }).click();
+  await selectPanel(page, 'Git');
   await page.getByRole('tab', { name: /^PRs/ }).click();
   await expect(page.getByText('GitHub connected')).toBeVisible();
   await expect(page.getByText('No open pull requests')).toBeVisible();
