@@ -65,10 +65,7 @@ class ComputePool {
   }
 
   startContributing(): void {
-    if (this.contributing) return;
-    this.contributing = true;
-    // In prod: spawn a Web Worker that polls for tasks and executes them via WASM
-    console.log('ComputePool: contributing idle cycles');
+    throw new Error('Community compute is not configured in this release; no work will be run in this browser.');
   }
 
   stopContributing(): void {

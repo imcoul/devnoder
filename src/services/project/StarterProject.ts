@@ -1,5 +1,5 @@
 import { bufferManager } from '../editor/BufferManager';
-import { commit, stageAll, writeFile } from '../git/GitService';
+import { writeFile } from '../git/GitService';
 import { projectService } from './ProjectService';
 
 export const STARTER_PROJECT_FILES = {
@@ -57,8 +57,6 @@ export async function createStarterProject(name: string) {
   for (const [path, content] of Object.entries(STARTER_PROJECT_FILES)) {
     await writeFile(path, content);
   }
-  await stageAll();
-  await commit('Initial browser starter project');
   bufferManager.open('index.html', STARTER_PROJECT_FILES['index.html'], 'html');
   return project;
 }

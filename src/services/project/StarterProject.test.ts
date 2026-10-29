@@ -28,8 +28,8 @@ describe('createStarterProject', () => {
     expect(writeFile).toHaveBeenCalledWith('index.html', STARTER_PROJECT_FILES['index.html']);
     expect(writeFile).toHaveBeenCalledWith('style.css', STARTER_PROJECT_FILES['style.css']);
     expect(writeFile).toHaveBeenCalledWith('app.js', STARTER_PROJECT_FILES['app.js']);
-    expect(stageAll).toHaveBeenCalledOnce();
-    expect(commit).toHaveBeenCalledWith('Initial browser starter project');
+    expect(stageAll).not.toHaveBeenCalled();
+    expect(commit).not.toHaveBeenCalled();
     expect(bufferManager.open).toHaveBeenCalledWith('index.html', STARTER_PROJECT_FILES['index.html'], 'html');
     expect(project.name).toBe('My Web Project');
   });

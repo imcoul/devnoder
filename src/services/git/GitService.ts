@@ -73,6 +73,26 @@ export interface Branch {
   remote?: string;
 }
 
+export interface GitAuthor {
+  name: string;
+  email: string;
+}
+
+export const DEFAULT_GIT_AUTHOR: GitAuthor = {
+  name: 'Local Developer',
+  email: 'local@devnoder.invalid',
+};
+
+export function isGitAuthorConfigured(author: GitAuthor): boolean {
+  return author.name.trim().length > 0 && author.name.trim().length <= 100
+    && ![...author.name].some(character => {
+      const code = character.charCodeAt(0);
+      return code < 0x20 || code === 0x7f;
+    })
+    && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(author.email.trim())
+    && !author.email.trim().toLowerCase().endsWith('.invalid');
+}
+
 // Init or open repo
 export async function initRepo(): Promise<void> {
   const dir = getDir();
@@ -82,9 +102,35 @@ export async function initRepo(): Promise<void> {
     await fs.promises.mkdir('/projects').catch(() => {});
     await fs.promises.mkdir(dir).catch(() => {});
     await git.init({ fs, dir, defaultBranch: 'main' });
-    await git.setConfig({ fs, dir, path: 'user.name',  value: 'DevNoder User' });
-    await git.setConfig({ fs, dir, path: 'user.email', value: 'dev@srvel.io' });
   }
+
+  const name = await git.getConfig({ fs, dir, path: 'user.name' });
+  const email = await git.getConfig({ fs, dir, path: 'user.email' });
+  if (!name || name === 'DevNoder User') {
+    await git.setConfig({ fs, dir, path: 'user.name', value: DEFAULT_GIT_AUTHOR.name });
+  }
+  if (!email || email === 'dev@srvel.io') {
+    await git.setConfig({ fs, dir, path: 'user.email', value: DEFAULT_GIT_AUTHOR.email });
+  }
+}
+
+export async function getGitAuthorConfig(): Promise<GitAuthor> {
+  const dir = getDir();
+  return {
+    name: await git.getConfig({ fs, dir, path: 'user.name' }) ?? DEFAULT_GIT_AUTHOR.name,
+    email: await git.getConfig({ fs, dir, path: 'user.email' }) ?? DEFAULT_GIT_AUTHOR.email,
+  };
+}
+
+export async function saveGitAuthorConfig(author: GitAuthor): Promise<GitAuthor> {
+  const cleaned = { name: author.name.trim(), email: author.email.trim() };
+  if (!isGitAuthorConfigured(cleaned)) {
+    throw new Error('Enter your own commit name and a valid email address. Use a GitHub noreply address if you prefer not to publish your personal email.');
+  }
+  const dir = getDir();
+  await git.setConfig({ fs, dir, path: 'user.name', value: cleaned.name });
+  await git.setConfig({ fs, dir, path: 'user.email', value: cleaned.email });
+  return cleaned;
 }
 
 export async function getStatus(): Promise<FileStatus[]> {
@@ -123,13 +169,12 @@ export async function stageAll(): Promise<void> {
 
 export async function commit(message: string): Promise<string> {
   const dir = getDir();
+  const author = await getGitAuthorConfig();
+  if (!isGitAuthorConfigured(author)) {
+    throw new Error('Set your commit identity in Git > Changes before creating a commit.');
+  }
   // cue fired by GitPanel after success/error
-  return git.commit({ fs, dir, message,
-    author: {
-      name:  await git.getConfig({ fs, dir, path: 'user.name'  }) ?? 'DevNoder User',
-      email: await git.getConfig({ fs, dir, path: 'user.email' }) ?? 'dev@srvel.io',
-    },
-  });
+  return git.commit({ fs, dir, message, author });
 }
 
 export async function getLog(depth = 20): Promise<CommitEntry[]> {
@@ -181,9 +226,13 @@ export async function push(remote = 'origin', branch?: string, token?: string): 
 export async function pull(remote = 'origin', branch?: string, token?: string): Promise<void> {
   const dir = getDir();
   const ref = branch ?? (await git.currentBranch({ fs, dir })) ?? 'main';
+  const author = await getGitAuthorConfig();
+  if (!isGitAuthorConfigured(author)) {
+    throw new Error('Set your commit identity in Git > Changes before pulling, so any merge commit is attributed correctly.');
+  }
   await git.pull({
     fs, http, dir, remote, ref,
-    author: { name: 'DevNoder User', email: 'dev@srvel.io' },
+    author,
     onAuth: token ? () => ({ username: 'x-access-token', password: token }) : undefined,
   });
 }

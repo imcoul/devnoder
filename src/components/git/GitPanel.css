@@ -18,6 +18,14 @@
 .git-remote-buttons { display:flex; gap:0.4rem; }
 .git-remote-buttons button { flex:1; }
 .git-sync-status { color:var(--color-success); font-size:0.72rem; }
+.git-author-box { display:flex; flex-direction:column; gap:0.4rem; padding:0.55rem 0.6rem; border-block-end:1px solid var(--color-border); font-size:0.72rem; }
+.git-author-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:0.25rem 0.6rem; }
+.git-author-heading span { color:var(--color-turquoise); font-size:0.68rem; }
+.git-author-box p { color:var(--color-text-muted); line-height:1.45; }
+.git-author-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr)); gap:0.45rem; }
+.git-author-fields label { display:flex; min-inline-size:0; flex-direction:column; gap:0.25rem; color:var(--color-text-muted); }
+.git-author-fields input { min-inline-size:0; min-block-size:2rem; padding:0.35rem 0.45rem; border:1px solid var(--color-border); border-radius:0.25rem; background:var(--color-canvas); color:var(--color-text); font-size:0.75rem; }
+.git-author-fields input:focus { outline:2px solid var(--color-turquoise); outline-offset:1px; }
 .git-file-row { display:flex; align-items:center; gap:0.4rem; padding:0.3rem 0.6rem; cursor:pointer; border-block-end:1px solid var(--color-border); }
 .git-file-row:hover { background:var(--color-surface-hover); }
 .git-file-status { font-family:var(--font-code); font-weight:700; inline-size:1rem; text-align:center; flex-shrink:0; }

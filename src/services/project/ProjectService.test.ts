@@ -75,8 +75,13 @@ describe('ProjectService', () => {
   });
 
   it('createProject with template applies template', async () => {
+    const git = await import('../git/GitService');
+    const { templateService } = await import('../templates/TemplateService');
     const record = await projectService.createProject('My Project', { templateId: 'react' });
     expect(record.name).toBe('My Project');
+    expect(templateService.apply).toHaveBeenCalled();
+    expect(git.stageAll).not.toHaveBeenCalled();
+    expect(git.commit).not.toHaveBeenCalled();
   });
 
   it('openProject switches active project', async () => {

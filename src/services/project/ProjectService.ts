@@ -3,7 +3,7 @@
 // db.projects was defined but never read or written anywhere before this file.
 import { db, ProjectRecord, getSetting, setSetting } from '../storage/db';
 import {
-  fs, initRepo, clone, stageAll, commit, setActiveProject,
+  fs, initRepo, clone, setActiveProject,
 } from '../git/GitService';
 import { gitHubAPI } from '../git/GitHubAPI';
 import { templateService } from '../templates/TemplateService';
@@ -71,11 +71,7 @@ export const projectService = {
     if (options.templateId) {
       templateService.setFS(fs);
       const dirPath = `/projects/${record.id}`;
-      const { errors } = await templateService.apply(options.templateId, dirPath);
-      if (errors.length === 0) {
-        await stageAll();
-        await commit(`Initial commit from template: ${options.templateId}`);
-      }
+      await templateService.apply(options.templateId, dirPath);
     }
 
     return record;

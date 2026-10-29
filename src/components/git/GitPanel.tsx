@@ -5,6 +5,7 @@ import {
   commit, getLog, getBranches, createBranch, checkoutBranch,
   listFiles, listRemotes, setRemote, push as pushRemote, pull as pullRemote,
   readFile, writeFile, normalizeProjectPath,
+  getGitAuthorConfig, saveGitAuthorConfig, isGitAuthorConfigured, type GitAuthor,
   FileStatus, CommitEntry, Branch,
 } from '../../services/git/GitService';
 import { gitHubAPI, PullRequest, Issue, CIRun } from '../../services/git/GitHubAPI';
@@ -15,6 +16,7 @@ import { diffTracker } from '../../services/ai/DiffTracker';
 import { createProjectArchive } from '../../services/project/ProjectArchive';
 import { db } from '../../services/storage/db';
 import { $projectContext } from '../../stores/projectContext';
+import { AppIcon } from '../brand/AppIcon';
 import DiffViewer from '../editor/DiffViewer';
 import './GitPanel.css';
 
@@ -41,6 +43,10 @@ export default function GitPanel() {
   const projectContext = useStore($projectContext);
   const [queue, setQueue]           = useState<QueuedPush[]>([]);
   const [commitMsg, setCommitMsg]   = useState('');
+  const [gitAuthor, setGitAuthor] = useState<GitAuthor>({ name: 'Local Developer', email: 'local@devnoder.invalid' });
+  const [gitAuthorConfigured, setGitAuthorConfigured] = useState(false);
+  const [savingGitAuthor, setSavingGitAuthor] = useState(false);
+  const [gitAuthorMessage, setGitAuthorMessage] = useState<string | null>(null);
   const [newBranch, setNewBranch]   = useState('');
   const [newFilePath, setNewFilePath] = useState('');
   const [creatingFile, setCreatingFile] = useState(false);
@@ -64,7 +70,9 @@ export default function GitPanel() {
   const refresh = useCallback(async () => {
     try {
       await initRepo();
-      const [s, l, b, f, remotes] = await Promise.all([getStatus(), getLog(), getBranches(), listFiles(), listRemotes()]);
+      const [s, l, b, f, remotes] = await Promise.all([
+        getStatus(), getLog(), getBranches(), listFiles(), listRemotes(),
+      ]);
       setStatus(s); setLog(l); setBranches(b); setFiles(f.sort((a, b) => a.localeCompare(b)));
       const origin = remotes.find(remote => remote.remote === 'origin');
       setRemoteUrl(origin?.url ?? '');
@@ -72,6 +80,21 @@ export default function GitPanel() {
       if (origin && gitHubAPI.parseRemoteUrl(origin.url)) localStorage.setItem('devnoder-remote-url', origin.url);
     } catch (e: any) { setError(e.message); }
   }, []);
+
+  const activeProjectId = projectContext?.project?.id ?? null;
+  useEffect(() => {
+    let current = true;
+    setGitAuthorConfigured(false);
+    setGitAuthorMessage(null);
+    void getGitAuthorConfig().then(author => {
+      if (!current) return;
+      setGitAuthor(author);
+      setGitAuthorConfigured(isGitAuthorConfigured(author));
+    }).catch(error => {
+      if (current) setError(error instanceof Error ? error.message : 'Could not read this repository’s commit identity.');
+    });
+    return () => { current = false; };
+  }, [activeProjectId]);
 
   useEffect(() => {
     refresh();
@@ -148,8 +171,30 @@ export default function GitPanel() {
   const unstage = async (path: string) => { await unstageFile(path); refresh(); };
   const stageEverything = async () => { await stageAll(); refresh(); };
 
+  const saveCommitIdentity = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSavingGitAuthor(true);
+    setError(null);
+    setGitAuthorMessage(null);
+    try {
+      const saved = await saveGitAuthorConfig(gitAuthor);
+      setGitAuthor(saved);
+      setGitAuthorConfigured(true);
+      setGitAuthorMessage(`This repository will attribute commits to ${saved.name} <${saved.email}>.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save this repository’s commit identity.');
+      setGitAuthorConfigured(false);
+    } finally {
+      setSavingGitAuthor(false);
+    }
+  };
+
   const doCommit = async () => {
     if (!commitMsg.trim()) return;
+    if (!gitAuthorConfigured) {
+      setError('Save your own commit name and email before creating a commit.');
+      return;
+    }
     setLoading(true);
     try {
       await commit(commitMsg);
@@ -386,7 +431,7 @@ export default function GitPanel() {
           <div className="git-remote-sync">
             <div className="git-remote-url" title={remoteUrl}>{remoteUrl || 'No origin configured'}</div>
             <div className="git-remote-buttons">
-              <button className="git-commit-btn" onClick={() => void syncProject('pull')} disabled={!remoteUrl || syncBusy}>
+              <button className="git-commit-btn" onClick={() => void syncProject('pull')} disabled={!remoteUrl || syncBusy || !gitAuthorConfigured}>
                 {syncBusy ? 'Syncing…' : 'Pull'}
               </button>
               <button className="git-commit-btn" onClick={() => void syncProject('push')} disabled={!remoteUrl || syncBusy}>
@@ -394,8 +439,29 @@ export default function GitPanel() {
               </button>
             </div>
             {!githubConnected && <p className="git-token-note">Connect a fine-grained GitHub token in the PRs, Issues, or CI tab before syncing. Commit local changes before push/pull.</p>}
+            {!gitAuthorConfigured && <p className="git-token-note">Set your commit identity below before pulling or creating commits. DevNoder will not attribute your work to Srvel.</p>}
             {syncMessage && <p className="git-sync-status" role="status">{syncMessage}</p>}
           </div>
+
+          <form className="git-author-box" onSubmit={saveCommitIdentity}>
+            <div className="git-author-heading">
+              <strong>Commit identity</strong>
+              <span>{gitAuthorConfigured ? 'Saved in this repository' : 'Required before commit or pull'}</span>
+            </div>
+            <p>Git records this name and email in commits visible on remotes. This is separate from GitHub sign-in. Use your own email or a GitHub noreply address.</p>
+            <div className="git-author-fields">
+              <label>Name<input value={gitAuthor.name} maxLength={100} autoComplete="name"
+                aria-label="Git commit author name"
+                onChange={event => { setGitAuthor(current => ({ ...current, name: event.target.value })); setGitAuthorConfigured(false); setGitAuthorMessage(null); }} /></label>
+              <label>Email<input type="email" value={gitAuthor.email} maxLength={254} autoComplete="email"
+                aria-label="Git commit author email"
+                onChange={event => { setGitAuthor(current => ({ ...current, email: event.target.value })); setGitAuthorConfigured(false); setGitAuthorMessage(null); }} /></label>
+            </div>
+            <button className="git-commit-btn" type="submit" disabled={savingGitAuthor || !isGitAuthorConfigured(gitAuthor)}>
+              {savingGitAuthor ? 'Saving identity…' : gitAuthorConfigured ? 'Update identity' : 'Save commit identity'}
+            </button>
+            {gitAuthorMessage && <p className="git-sync-status" role="status">{gitAuthorMessage}</p>}
+          </form>
 
           {/* Staged */}
           <div className="git-section-head">
@@ -434,12 +500,12 @@ export default function GitPanel() {
                 placeholder="Commit message (feat: …)" />
               <button className="git-ai-btn" onClick={aiMessage} disabled={generating}
                 aria-label="AI suggest commit message" title="AI suggest">
-                {generating ? '…' : '✨'}
+                {generating ? '…' : <AppIcon name="sparkle" size={16} />}
               </button>
             </div>
             <button className="git-commit-btn" onClick={doCommit}
-              disabled={loading || !commitMsg.trim() || staged.length === 0}>
-              {loading ? 'Committing…' : `Commit (${staged.length})`}
+              disabled={loading || !commitMsg.trim() || staged.length === 0 || !gitAuthorConfigured}>
+              {loading ? 'Committing…' : gitAuthorConfigured ? `Commit (${staged.length})` : 'Set identity to commit'}
             </button>
           </div>
 
