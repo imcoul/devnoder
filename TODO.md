@@ -1,31 +1,32 @@
 # DevNoder — active acceptance backlog
 
-Live product: https://devnoder.srvel.net. Pages project `devnoder` deploys `codex/repair-first-project`; draft PR #3 targets `develop`. Neither main nor develop was merged. A push to this branch is a production change. Public source links open the deployed branch, not stale main documentation.
+Live product: https://devnoder.srvel.net. Cloudflare Pages project `devnoder` builds `codex/repair-first-project`; draft PR #3 targets `develop`. Neither `main` nor `develop` was merged. A push to this branch updates production (the owner explicitly authorized this branch as production source); inspect Pages and GitHub checks after each push.
 
-## Delivered product-coherence repair — 28 October 2026
+## Delivered product-coherence repair — 28–29 October 2026
 
-- [x] One DevNoder node/code mark, visible Srvel endorsement, self-hosted Instrument Sans/Livvic/JetBrains Mono and Phosphor outline icons for primary controls. Public root/Guide/About content, canonical/share metadata, sitemap, robots and current README/CONTRIBUTING.
-- [x] Recommended browser web starter writes/commits HTML/CSS/classic JS, opens index.html and supports edit → static preview → ZIP → reload.
-- [x] Persistent project identity, Browser local state, Projects access and ZIP backup.
-- [x] Files in Code; full-width mobile editor with Files drawer; direct blank-project new-file action. First-buffer CodeMirror initialization and saved starter resume defects fixed.
-- [x] Code / AI / Preview / Git / More hierarchy, preserved secondary tools, More keyboard/Escape focus restoration and narrow-screen Settings.
-- [x] One accessible AI/model dialog; local/hosted readiness before send; manual downloads and progressive storage/compatibility disclosure. No automatic startup embedding/model download.
-- [x] Official Qwen 0.5B ONNX q8 fallback replaces the invalid old Xenova path. Correct chat input/output, real percentage units, disposal and non-simulated WASM output.
-- [x] Isolated browser downloaded a trained Qwen coding model and generated an add function; three isolated VM checks passed. One useful task, not a broad benchmark or device/offline guarantee. A smaller model's poor output was not counted as useful coding.
-- [x] Template environment requirements before selection. Unsupported remote preview/tunnels, paid billing, remote sharing and nonexistent registry plugins are unavailable/not configured rather than fake success. Broken notebook/GGUF instructions removed.
-- [x] Notion main project is In Progress with live link, draft PR #3 and historical/current roadmap distinction. Locked portfolio brand decisions were preserved.
+- [x] One DevNoder node/code mark, visible Srvel endorsement, self-hosted Instrument Sans/Livvic/JetBrains Mono and Phosphor outline icons for primary controls. Public root/Guide/About, canonical/share metadata, sitemap, robots, and current README/CONTRIBUTING.
+- [x] Recommended browser-runnable HTML/CSS/classic-JavaScript starter opens its first source. Starter and templates remain uncommitted until the user chooses an author and commits; no synthetic Srvel author or surprise initial commit.
+- [x] Persistent project identity, browser-local state, Projects access and ZIP backup. Files in Code; full-width mobile editor with Files drawer; direct blank-project new-file action. First-buffer CodeMirror initialization and saved starter resume defects fixed.
+- [x] Code / AI / Preview / Git / More hierarchy; secondary tools remain reachable; More keyboard/Escape focus restoration; complete localized English/French/Arabic menu labels; narrow-screen Settings. One accessible AI/model dialog.
+- [x] Local/hosted readiness before send; manual downloads and progressive storage/compatibility disclosure. No automatic startup embedding/model download.
+- [x] Official Qwen 0.5B ONNX q8 fallback replaces the invalid old Xenova path. Correct chat input/output, real percentage units, disposal, actual runtime/artifact reporting, and non-simulated WASM output.
+- [x] Isolated browser downloaded a trained Qwen coding model and generated an add function; three isolated VM checks passed. One useful task, not a broad benchmark or device/offline guarantee. A smaller model's poor output was not counted as useful.
+- [x] Editable local subscription values cannot restore paid tiers; checkout and license activation refuse until a real server entitlement exists. Community compute no longer claims to donate CPU or earn credits; its action is not offered. Unsupported remote preview/tunnels, paid billing, remote sharing and nonexistent registry plugins are not advertised as working. Broken notebook/GGUF instructions removed.
+- [x] Git author is explicit, project-scoped and user-controlled. Git commit/pull require a real configured identity. GitHub token tests remain mocked; no real credentialed remote write was used.
+- [x] Notion main project records live link, draft PR #3 and historical/current roadmap distinction. Locked portfolio brand decisions were preserved.
 
 ## Verification checkpoint
 
-Clean npm ci, TypeScript/production build, 148 unit tests in 24 files and 14 desktop/Android-profile Chromium scenarios pass. Every emitted Pages asset is below 25 MiB. Lint: zero errors, 237 inherited warnings. Global coverage: approximately 25.95% statements / 20.67% branches / 27.44% functions / 28.11% lines. Full audit: four low build-time deepmerge/workbox/PWA-chain advisories, no moderate/high/critical findings. No patched same-major deepmerge release was published; npm's breaking PWA downgrade was not forced.
+Clean install and production TypeScript/Vite build pass. Unit suite: **27 files / 156 tests passed**. Browser suite: **18 desktop/Android-profile Chromium scenarios passed**, including starter edit/preview/ZIP/reload, direct Code creation, responsive navigation, model registration, user-owned commit identity, billing/compute unavailability, and mocked GitHub-token persistence. This is browser emulation, not a physical Android device. ESLint exits zero with **235 warnings**. Global line coverage is **29.57%** (statements 27.30%, branches 22.05%, functions 28.99%). Production dependency audit: **0 advisories**; full audit: **4 low build-tool-only findings** in the Workbox/PWA `deepmerge` chain, no moderate/high/critical findings. npm offers only a breaking downgrade for that chain; it was not forced. PWA build contains 107 precache entries (~18.25 MiB); emitted assets remain below Cloudflare's 25 MiB file limit.
+
+The current implementation was validated locally before publishing it to the already-approved production branch. For the resulting push, verify the exact Pages deployment, GitHub Actions and live browser flow and record results in the dated product report. Keep PR #3 open/draft unless the owner separately requests a merge.
 
 ## Remaining acceptance — not marked complete
 
-- [ ] Confirm this redesigned commit's Pages deployment, remote CI and full live-hostname browser acceptance; record final evidence in the dated report without recursive status-only pushes.
-- [ ] Physical Android/iOS, real WebGPU and representative model/device performance; offline reload and browser cache eviction. Emulation is not physical-device evidence.
-- [ ] Real credentialed GitHub clone/push/pull/conflicts and hosted-provider requests. Browser GitHub API validation is mocked, not a real remote-write test.
-- [ ] General cloud/native execution, npm/framework dev servers, native/GGUF runtimes, collaboration transport, real billing and registry backends. Static preview and source code do not supply those services.
-- [ ] Raise coverage, reduce inherited type/effect warnings and apply a tested upstream fix for the low build-time deepmerge advisory.
-- [ ] Decide public access: free zone-wide Bot Fight Mode may challenge automated requests. No safe per-host skip exists for that mode; unrelated Srvel protections were not disabled. Pages alias has separate browser-local storage, not seamless continuity.
-- [ ] Separate LogoForge Supabase access/ownership review with explicit application scope. There is no connected DevNoder Supabase client/project; private metadata findings were not published here or blindly migrated.
-- [ ] Srvel parent homepage and portfolio-wide brand-policy reconciliation. This product pass does not change parent DNS or locked policies.
+- [ ] Real WebGPU on physical desktop/mobile devices, larger model memory/performance and storage eviction; offline reload/persistence under real quota pressure.
+- [ ] Real credentialed GitHub clone/push/pull/conflicts and hosted-provider CORS/API requests. Browser tests use mocked GitHub API and test-only tokens.
+- [ ] General cloud/native execution, npm/framework dev servers, arbitrary GGUF/native runtimes, collaboration transport, real billing and registry backends. Static preview and local file adapters are not those services.
+- [ ] Raise coverage; reduce inherited lint warnings; apply a tested upstream fix for the low build-time `deepmerge` advisory.
+- [ ] Public access: free zone-wide Bot Fight Mode may challenge automated requests. No zone-wide security downgrade or unrelated Srvel protection change was made. Pages alias is a separate origin with separate browser-local files.
+- [ ] Separate LogoForge Supabase access/ownership review with explicit application scope. No connected DevNoder Supabase client/project; unrelated private metadata was not mutated or disclosed.
+- [ ] Srvel parent homepage and portfolio-wide brand-policy reconciliation. This pass does not change parent DNS or locked policies.

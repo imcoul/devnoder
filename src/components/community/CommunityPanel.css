@@ -1,6 +1,6 @@
 .community-panel { display:flex; flex-direction:column; block-size:100%; background:var(--color-canvas); color:var(--color-text); font-size:0.83rem; }
 .community-tabs { display:flex; background:var(--color-surface); border-block-end:1px solid var(--color-border); flex-shrink:0; }
-.community-tab { padding:0.45rem 0.8rem; border:none; background:none; color:var(--color-text-muted); cursor:pointer; font-size:0.78rem; border-block-end:2px solid transparent; white-space:nowrap; }
+.community-tab { display:inline-flex; align-items:center; gap:0.4rem; padding:0.45rem 0.8rem; border:none; background:none; color:var(--color-text-muted); cursor:pointer; font-size:0.78rem; border-block-end:2px solid transparent; white-space:nowrap; }
 .community-tab.active { color:var(--color-turquoise); border-block-end-color:var(--color-turquoise); }
 .community-body { flex:1; overflow-y:auto; display:flex; flex-direction:column; }
 .community-section-head { padding:0.35rem 0.6rem; background:var(--color-surface); font-size:0.72rem; font-weight:700; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:0.05em; border-block-end:1px solid var(--color-border); flex-shrink:0; }
@@ -49,6 +49,9 @@
 .compute-card { margin:0.6rem; padding:0.8rem; border:1px solid var(--color-border); border-radius:0.4rem; display:flex; flex-direction:column; gap:0.6rem; }
 .compute-card-title { font-weight:700; font-size:0.88rem; }
 .compute-desc { font-size:0.78rem; color:var(--color-text-muted); line-height:1.5; }
+.compute-unavailable { display:flex; flex-direction:column; gap:0.3rem; padding:0.65rem; border:1px solid var(--color-border); border-inline-start:3px solid var(--color-warn); border-radius:0.25rem; background:var(--color-surface); }
+.compute-unavailable strong { font-size:0.78rem; }
+.compute-unavailable p { color:var(--color-text-muted); font-size:0.72rem; line-height:1.5; }
 .compute-stats { display:grid; grid-template-columns:repeat(2,1fr); gap:0.4rem; }
 .compute-stat { display:flex; flex-direction:column; align-items:center; padding:0.5rem; background:var(--color-surface); border-radius:0.3rem; border:1px solid var(--color-border); }
 .stat-val { font-size:1.2rem; font-weight:700; color:var(--color-turquoise); }

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useStore } from '@nanostores/react';
 import { useTranslation } from 'react-i18next';
 import { $theme, $lang, $ui, ThemeId, Lang, setPanel } from '../../stores/ui';
-import { subscriptionService, PLANS, Tier } from '../../services/revenue/SubscriptionService';
+import { subscriptionService, Tier } from '../../services/revenue/SubscriptionService';
 import { audioCueService, CueConfig } from '../../services/accessibility/AudioCueService';
 import { aiGateway } from '../../services/ai/AIGateway';
 import { AppIcon } from '../brand/AppIcon';
@@ -35,8 +35,6 @@ export default function SettingsPanel() {
   const ui = useStore($ui);
   const [section, setSection] = useState<Section>('appearance');
   const [tier, setTier] = useState<Tier>('free');
-  const [licenseKey, setLicenseKey] = useState('');
-  const [licenseMsg, setLicenseMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [keys, setKeys] = useState<Record<string, string>>({ groq: '', openai: '', anthropic: '', openrouter: '' });
   const [saved, setSaved] = useState(false);
   const [audioCfg, setAudioCfg] = useState<CueConfig>(() => audioCueService.getConfig());
@@ -74,16 +72,9 @@ export default function SettingsPanel() {
     setPanel('ai');
   };
 
-  const activateLicense = async () => {
-    const result = await subscriptionService.activateLicense(licenseKey.trim());
-    setLicenseMsg({ ok: result.success, text: result.message });
-    if (result.success) setTier(result.tier);
-  };
-
   const deactivate = () => {
     subscriptionService.deactivate();
     setTier('free');
-    setLicenseMsg({ ok: true, text: 'Deactivated — back to Free plan.' });
   };
 
   const updateAudio = (patch: Partial<CueConfig>) => {
@@ -165,10 +156,16 @@ export default function SettingsPanel() {
         {section === 'subscription' && (
           <div className="settings-section">
             <h2 className="settings-section-title">Subscription</h2>
-            <div className={`current-plan-card plan-card--${tier}`}><div className="plan-card-tier">{subscriptionService.getPlan().name}</div><div className="plan-card-price">{subscriptionService.getPlan().price}</div>{tier !== 'free' && subscriptionService.daysRemaining() !== null && <div className="plan-card-expiry">{subscriptionService.daysRemaining()} days remaining</div>}</div>
-            {tier !== 'free' && <button className="settings-danger-btn" onClick={deactivate}>Deactivate license</button>}
-            {tier === 'free' && <div className="license-activate"><div className="settings-group-label">Have a license key?</div><div className="settings-field-row"><input className="settings-input" value={licenseKey} placeholder="PRO-XXXX-XXXX-XXXX" onChange={event => setLicenseKey(event.target.value)} /><button className="settings-save-btn" onClick={activateLicense}>Activate</button></div>{licenseMsg && <p className={`license-msg ${licenseMsg.ok ? 'license-msg--ok' : 'license-msg--err'}`}>{licenseMsg.text}</p>}</div>}
-            <div className="plan-grid">{PLANS.map(plan => <div key={plan.id} className={`plan-option ${tier === plan.id ? 'plan-option--current' : ''}`}><div className="plan-option-name">{plan.name}</div><div className="plan-option-price">{plan.price}</div><ul className="plan-features">{plan.features.slice(0, 6).map((feature, index) => <li key={index}><AppIcon name="check" size={14} />{feature}</li>)}{plan.features.length > 6 && <li className="plan-more">+{plan.features.length - 6} more</li>}</ul>{tier !== plan.id && plan.id !== 'free' && <a className="plan-upgrade-btn" href="https://srvel.net" target="_blank" rel="noopener noreferrer">Learn about plans <AppIcon name="arrowsquareout" size={14} /></a>}{tier === plan.id && <span className="plan-current-badge">Current plan</span>}</div>)}</div>
+            <div className="settings-callout" role="status">
+              <AppIcon name="warning" size={20} />
+              <div><strong>Billing is not available in this release</strong><span>Checkout, paid-feature provisioning, and license activation are not configured. No purchase action is offered from this app.</span></div>
+            </div>
+            <div className={`current-plan-card plan-card--${tier}`}>
+              <div className="plan-card-tier">Saved local tier: {subscriptionService.getPlan().name}</div>
+              <div className="plan-card-price">This browser value is informational and is not a verified entitlement.</div>
+              {tier !== 'free' && subscriptionService.daysRemaining() !== null && <div className="plan-card-expiry">Saved expiry: {subscriptionService.daysRemaining()} days remaining</div>}
+            </div>
+            {tier !== 'free' && <button className="settings-danger-btn" onClick={deactivate}>Clear saved tier from this browser</button>}
           </div>
         )}
 

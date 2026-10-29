@@ -5,7 +5,6 @@ export const PRODUCT_IDENTITY = {
   issues: 'https://github.com/imcoul/devnoder/issues',
   guide: 'https://devnoder.srvel.net/guide/',
   about: 'https://devnoder.srvel.net/about/',
-  parent: 'https://srvel.net',
   license: 'AGPL-3.0',
 } as const;
 

@@ -32,13 +32,6 @@ function formatStorageBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GiB`;
 }
 
-function providerLabel(provider: ModelConfig['provider']): string {
-  if (provider === 'webllm') return 'WebLLM / WebGPU';
-  if (provider === 'transformers') return 'Transformers.js ONNX';
-  if (provider === 'openai-compatible') return 'OpenAI-compatible server';
-  return provider;
-}
-
 function ActionBlock({ action }: { action: BoltAction }) {
   const [applied, setApplied] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -291,6 +284,18 @@ export default function AIPanel() {
   const modelRuntimeAvailable = webgpuAvailable || !!selectedModel.transformersModelId;
   const selectedModelProgress = loadProgress?.modelId === modelId ? loadProgress : null;
   const localModelIsLoaded = webLLMManager.isLoadedFor(modelId);
+  const activeLocalRuntime = webLLMManager.getActiveRuntimeInfo(modelId);
+  const availableRuntimeLabel = selectedModel.provider === 'transformers'
+    ? 'Transformers.js / WASM'
+    : selectedModel.transformersModelId
+      ? webgpuAvailable ? 'WebLLM / WebGPU · WASM fallback available' : 'Transformers.js / WASM fallback'
+      : 'WebLLM / WebGPU';
+  const localRuntimeLabel = activeLocalRuntime?.runtime ?? availableRuntimeLabel;
+  const localArtifactId = activeLocalRuntime?.artifactId
+    ?? ((!webgpuAvailable && selectedModel.transformersModelId) || selectedModel.provider === 'transformers'
+      ? selectedModel.transformersModelId ?? selectedModel.id
+      : selectedModel.id);
+  const localDtype = activeLocalRuntime?.dtype ?? (!webgpuAvailable ? selectedModel.transformersDtype : undefined);
   const setupState = aiGateway.getModelSetupState(selectedModel);
   const canSend = selectedModel.offlineCapable ? localModelIsLoaded : setupState.configured;
   const readinessMessage = selectedModel.offlineCapable
@@ -568,9 +573,9 @@ export default function AIPanel() {
       {selectedModel.offlineCapable && (
         <section className="ai-local-model-manager" aria-label="Local model download and cache">
           <div className="ai-local-model-status" role="status" aria-live="polite">
-            {localStatus} · {providerLabel(selectedModel.provider)}
+            {localStatus} · {localRuntimeLabel}
           </div>
-          <p className="ai-key-note">Model: <code>{selectedModel.id}</code>. Local weights stay in this browser and download only after you choose a preparation action.</p>
+          <p className="ai-key-note">Selected: <code>{selectedModel.id}</code>. Runtime files: <code>{localArtifactId}</code>{localDtype ? ` (${localDtype.toUpperCase()})` : ''}. Files stay in this browser and download only after you choose a preparation action.</p>
           {localModelIsLoaded ? (
             <button className="ai-clear-btn" onClick={unloadSelectedLocalModel} disabled={modelAction}>
               {modelAction ? 'Unloading…' : 'Unload from this tab'}

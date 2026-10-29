@@ -31,4 +31,7 @@ test('search and add a model from the installed WebLLM registry', async ({ page 
   await page.getByRole('button', { name: 'Add compatible HF model' }).click();
   await expect(page.getByRole('combobox', { name: 'AI model' }))
     .toHaveValue('transformers:onnx-community/Qwen2.5-Coder-0.5B-Instruct');
+  await expect(page.locator('.ai-local-model-status')).toContainText('Transformers.js / WASM');
+  await expect(page.locator('.ai-local-model-manager .ai-key-note').first())
+    .toContainText('onnx-community/Qwen2.5-Coder-0.5B-Instruct');
 });

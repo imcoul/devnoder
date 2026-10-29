@@ -65,3 +65,12 @@ Clean install/build, 148 unit tests and 14 desktop/Android-profile browser scena
 Notion now reflects In Progress, live URL and draft PR #3; earlier PR #2/sprint notes are historical. Portfolio policies and parent DNS were preserved. Supabase metadata and free Bot Fight Mode were inspected without blind cross-product security mutations.
 
 Publish the verified product changes to the already-approved live repair branch, wait for Pages/GitHub CI and run the live-domain suite. Record final evidence in the dated repair report instead of recursively pushing status-only hashes. Do not merge main/develop without instruction. Remaining platform and wider-security decisions stay in TODO.md.
+
+
+## Product-coherence validation update — 29 October 2026
+
+The first-use repair now leaves starter/template files uncommitted until a user supplies their own per-project Git identity. The initial user-facing Git form is stable across status refreshes. Editable local subscription values cannot restore paid tiers, billing/license calls fail closed, and the Community compute control cannot claim that work is being performed. More-menu items are labeled in English, French and Arabic, and remaining primary navigation/export controls use the shared outline icon set.
+
+Latest local validation for this change set: clean production TypeScript/Vite build; 27 unit-test files / 156 tests; 18 desktop and Android-profile Chromium browser scenarios; ESLint exits zero with 235 warnings. Global line coverage is 29.57%. Production dependency audit reports zero; full audit contains four low build-tool-only Workbox/PWA/deepmerge findings with no moderate/high/critical items. No breaking PWA downgrade was applied. These results prove the tested subset, not physical mobile/WebGPU performance or all platform services.
+
+A push to `codex/repair-first-project` is a production change, already explicitly authorized. After publishing this change set, verify the exact Cloudflare Pages deployment, GitHub CI and live URL; use the separate dated report for the immutable test/deployment evidence. Keep PR #3 open/draft and do not merge to `develop`/`main` unless the owner separately asks. The wider execution, collaboration, real Git-provider, billing, storage/offline, and LogoForge Supabase ownership gates remain open in `TODO.md`.

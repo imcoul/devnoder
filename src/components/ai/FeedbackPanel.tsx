@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { feedbackStore, FeedbackEntry, Rating } from '../../services/ai/FeedbackStore';
 import { finetuneExport, ExportFormat, ExportStats } from '../../services/community/FinetuneExport';
 import { showToast } from '../../stores/ui';
+import { AppIcon } from '../brand/AppIcon';
 import './FeedbackPanel.css';
 
 const RATING_ICONS: Record<Rating, string> = { good: '👍', bad: '👎', edited: '✏️' };
@@ -77,7 +78,7 @@ export default function FeedbackPanel() {
     <div className="feedback-panel">
       {/* Zero-telemetry header */}
       <div className="feedback-trust-bar">
-        <span className="feedback-trust-icon">🔒</span>
+        <AppIcon name="lock" size={16} className="feedback-trust-icon" />
         <span>Your AI stays yours — all feedback stored locally, never transmitted</span>
       </div>
 
@@ -100,7 +101,7 @@ export default function FeedbackPanel() {
           ))}
         </select>
         <button className="feedback-export-btn" onClick={doExport} disabled={exporting || entries.length === 0}>
-          {exporting ? 'Exporting…' : '⬇ Export'}
+          {exporting ? 'Exporting…' : <><AppIcon name="download" size={16} /> Export</>}
         </button>
         {entries.length > 0 && (
           <button className="feedback-clear-btn" onClick={doClear}>Clear all</button>

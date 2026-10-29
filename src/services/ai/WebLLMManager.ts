@@ -5,10 +5,17 @@ import type { MCPTool } from './MCPConfigStore';
 type StreamHandler = (chunk: StreamChunk) => void;
 
 export type LocalModelPreparationState = 'not-prepared' | 'downloading' | 'ready-in-tab';
+export interface ActiveLocalRuntimeInfo {
+  runtime: 'WebLLM / WebGPU' | 'Transformers.js / WASM';
+  artifactId: string;
+  dtype?: string;
+}
 
 class WebLLMManager {
   private engine: any = null;
   private currentModelId = '';
+  private currentArtifactId = '';
+  private currentDtype: string | undefined;
   private loadingProgress = 0;
   private onProgressCbs = new Set<(p: number, label: string, modelId: string) => void>();
   private useTransformers = false;
@@ -26,6 +33,16 @@ class WebLLMManager {
     if (this.currentModelId === modelId && (this.engine || this.tfPipeline)) return 'ready-in-tab';
     if (this.loadingModelId === modelId && this.loadingPromise) return 'downloading';
     return 'not-prepared';
+  }
+
+  getActiveRuntimeInfo(modelId: string): ActiveLocalRuntimeInfo | null {
+    if (this.currentModelId !== modelId) return null;
+    if (this.engine) return { runtime: 'WebLLM / WebGPU', artifactId: this.currentArtifactId };
+    if (this.tfPipeline) return {
+      runtime: 'Transformers.js / WASM', artifactId: this.currentArtifactId,
+      ...(this.currentDtype ? { dtype: this.currentDtype } : {}),
+    };
+    return null;
   }
 
   private emitProgress(p: number, label: string, modelId = this.loadingModelId || this.currentModelId) {
@@ -74,6 +91,8 @@ class WebLLMManager {
         this.engine = engine;
         this.tfPipeline = null;
         this.currentModelId = modelId;
+        this.currentArtifactId = modelId;
+        this.currentDtype = undefined;
         this.useTransformers = false;
         return;
       } catch (e) {
@@ -112,6 +131,8 @@ class WebLLMManager {
     this.tfPipeline = loadedPipeline;
     this.emitProgress(100, 'Ready in this tab', modelId);
     this.currentModelId = modelId;
+    this.currentArtifactId = model.transformersModelId;
+    this.currentDtype = model.transformersDtype;
   }
 
   isLoadedFor(modelId: string): boolean {
@@ -295,6 +316,8 @@ class WebLLMManager {
     this.engine = null;
     this.tfPipeline = null;
     this.currentModelId = '';
+    this.currentArtifactId = '';
+    this.currentDtype = undefined;
     this.useTransformers = false;
     this.loadingProgress = 0;
   }

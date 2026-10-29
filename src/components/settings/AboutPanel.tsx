@@ -55,7 +55,6 @@ export default function AboutPanel() {
           <a href={PRODUCT_IDENTITY.source} target="_blank" rel="noopener noreferrer" className="about-link"><AppIcon name="github" size={18} />Source code</a>
           <a href={PRODUCT_IDENTITY.guide} className="about-link"><AppIcon name="filetext" size={18} />Read the public guide</a>
           <a href={PRODUCT_IDENTITY.issues} target="_blank" rel="noopener noreferrer" className="about-link"><AppIcon name="bug" size={18} />Report an issue</a>
-          <a href={PRODUCT_IDENTITY.parent} target="_blank" rel="noopener noreferrer" className="about-link"><AppIcon name="link" size={18} />Srvel</a>
         </div>
 
         <div className="about-philosophy">

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   pipeline: vi.fn(),
@@ -30,6 +30,8 @@ describe('WebLLMManager selected-model fidelity', () => {
     mocks.pipeline.mockResolvedValue(async () => [{ generated_text: 'assistant: ok' }]);
   });
 
+  afterEach(() => vi.unstubAllGlobals());
+
   it('uses the selected Qwen model’s declared Transformers.js repository on a non-WebGPU device', async () => {
     await webLLMManager.load('Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC');
 
@@ -38,6 +40,11 @@ describe('WebLLMManager selected-model fidelity', () => {
       'onnx-community/Qwen2.5-Coder-0.5B-Instruct',
       expect.objectContaining({ dtype: 'q8', progress_callback: expect.any(Function) }),
     );
+    expect(webLLMManager.getActiveRuntimeInfo('Qwen2.5-Coder-0.5B-Instruct-q4f16_1-MLC')).toEqual({
+      runtime: 'Transformers.js / WASM',
+      artifactId: 'onnx-community/Qwen2.5-Coder-0.5B-Instruct',
+      dtype: 'q8',
+    });
   });
 
   it('sends chat messages and reads the final assistant message from chat-shaped output', async () => {
@@ -103,13 +110,14 @@ describe('WebLLMManager selected-model fidelity', () => {
   });
 
   it('reports WebLLM cache state and deletes only the requested model cache', async () => {
+    vi.stubGlobal('caches', undefined);
     mocks.hasModelInCache.mockResolvedValue(true);
     const modelId = 'Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC';
 
     await expect(webLLMManager.hasCachedModelFiles(modelId)).resolves.toBe(true);
-    await webLLMManager.deleteCachedModelFiles(modelId);
+    await expect(webLLMManager.deleteCachedModelFiles(modelId)).resolves.toBeUndefined();
 
     expect(mocks.hasModelInCache).toHaveBeenCalledWith(modelId);
-    expect(mocks.deleteModelInCache).toHaveBeenCalledWith(modelId);
+    expect(mocks.deleteModelInCache).toHaveBeenCalledExactlyOnceWith(modelId);
   });
 });

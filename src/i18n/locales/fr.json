@@ -11,6 +11,10 @@
     "api": "API",
     "health": "Santé",
     "settings": "Réglages",
+    "community": "Communauté",
+    "plugins": "Extensions",
+    "billing": "Facturation",
+    "about": "À propos",
     "feedback": "Retours IA",
     "mcp": "Serveurs MCP",
     "skills": "Compétences"
