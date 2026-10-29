@@ -7,6 +7,25 @@
 .git-body { flex:1; overflow-y:auto; display:flex; flex-direction:column; }
 .git-section-head { display:flex; justify-content:space-between; align-items:center; padding:0.35rem 0.6rem; background:var(--color-surface); font-size:0.75rem; font-weight:600; color:var(--color-text-muted); border-block-end:1px solid var(--color-border); flex-shrink:0; }
 .git-link { background:none; border:none; color:var(--color-turquoise); cursor:pointer; font-size:0.75rem; }
+.git-file-actions { display:flex; align-items:center; gap:0.55rem; }
+.git-file-actions button:disabled { opacity:0.5; cursor:default; }
+.git-export-status { padding:0.35rem 0.6rem; color:var(--color-success); background:#22c55e18; font-size:0.72rem; overflow-wrap:anywhere; }
+.git-remote-form { padding:0.5rem 0.6rem; display:flex; flex-direction:column; gap:0.3rem; border-block-end:1px solid var(--color-border); font-size:0.72rem; color:var(--color-text-muted); }
+.git-remote-input-row { display:flex; gap:0.35rem; min-inline-size:0; }
+.git-remote-input-row input { flex:1; min-inline-size:0; padding:0.35rem 0.45rem; border:1px solid var(--color-border); border-radius:0.25rem; background:var(--color-canvas); color:var(--color-text); font-size:0.72rem; }
+.git-remote-sync { display:flex; flex-direction:column; gap:0.4rem; padding:0.45rem 0.6rem; border-block-end:1px solid var(--color-border); }
+.git-remote-url { font-size:0.7rem; color:var(--color-text-muted); overflow-wrap:anywhere; }
+.git-remote-buttons { display:flex; gap:0.4rem; }
+.git-remote-buttons button { flex:1; }
+.git-sync-status { color:var(--color-success); font-size:0.72rem; }
+.git-author-box { display:flex; flex-direction:column; gap:0.4rem; padding:0.55rem 0.6rem; border-block-end:1px solid var(--color-border); font-size:0.72rem; }
+.git-author-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:0.25rem 0.6rem; }
+.git-author-heading span { color:var(--color-turquoise); font-size:0.68rem; }
+.git-author-box p { color:var(--color-text-muted); line-height:1.45; }
+.git-author-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr)); gap:0.45rem; }
+.git-author-fields label { display:flex; min-inline-size:0; flex-direction:column; gap:0.25rem; color:var(--color-text-muted); }
+.git-author-fields input { min-inline-size:0; min-block-size:2rem; padding:0.35rem 0.45rem; border:1px solid var(--color-border); border-radius:0.25rem; background:var(--color-canvas); color:var(--color-text); font-size:0.75rem; }
+.git-author-fields input:focus { outline:2px solid var(--color-turquoise); outline-offset:1px; }
 .git-file-row { display:flex; align-items:center; gap:0.4rem; padding:0.3rem 0.6rem; cursor:pointer; border-block-end:1px solid var(--color-border); }
 .git-file-row:hover { background:var(--color-surface-hover); }
 .git-file-status { font-family:var(--font-code); font-weight:700; inline-size:1rem; text-align:center; flex-shrink:0; }
@@ -42,6 +61,9 @@
 .git-labels { display:flex; gap:0.2rem; flex-wrap:wrap; }
 .git-badge { font-size:0.65rem; padding:0.1rem 0.35rem; border-radius:1rem; background:var(--color-surface); border:1px solid var(--color-border); color:var(--color-text-muted); }
 .git-auth-prompt { display:flex; flex-direction:column; align-items:center; gap:0.8rem; padding:2rem; color:var(--color-text-muted); }
+.git-token-field { display:flex; flex-direction:column; gap:0.3rem; inline-size:min(100%,24rem); align-items:stretch; font-size:0.75rem; text-align:start; }
+.git-token-field input { padding:0.45rem 0.55rem; border:1px solid var(--color-border); border-radius:0.25rem; background:var(--color-canvas); color:var(--color-text); font-family:var(--font-code); }
+.git-token-note { max-inline-size:32rem; font-size:0.7rem; line-height:1.45; text-align:start; }
 
 /* CI/CD status dots */
 .git-ci-dot { inline-size:0.65rem; block-size:0.65rem; border-radius:50%; flex-shrink:0; margin-block-start:0.3rem; }

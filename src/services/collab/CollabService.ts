@@ -2,8 +2,9 @@
 import * as Y from 'yjs';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import { WebsocketProvider } from 'y-websocket';
+import { COLLAB_WEBSOCKET_URL } from '../../config/serviceEndpoints';
 
-const DO_URL = 'wss://devnoder-collab.srvel-build.workers.dev';
+const DO_URL = COLLAB_WEBSOCKET_URL;
 
 export interface Peer {
   clientId: number; name: string; color: string;

@@ -3,6 +3,7 @@
   background: #0a0a0a; color: #f0f6fc; font-family: var(--font-code);
   font-size: 0.82rem; cursor: text;
 }
+.terminal-capability-note { padding: 0.35rem 0.6rem; background: #151515; border-block-end: 1px solid #333; color: #9aa; font-family: var(--font-body); font-size: 0.7rem; line-height: 1.35; }
 .terminal-tabs {
   display: flex; align-items: stretch; overflow-x: auto;
   background: #111; border-block-end: 1px solid #333; flex-shrink: 0;

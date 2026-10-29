@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Terminal } from '@xterm/xterm';
-import { SandboxAddon } from '@cloudflare/sandbox/xterm';
-import { terminalSession, TerminalSession, OutputLine } from '../../services/terminal/TerminalSession';
+import { TerminalSession, type OutputLine } from '../../services/terminal/TerminalSession';
 import './TerminalPanel.css';
 
 interface Tab { id: string; label: string; }
@@ -10,7 +9,7 @@ interface Pane {
   tabId: string;
   session: TerminalSession;
   terminal: Terminal | null;
-  addon: SandboxAddon | null;
+  outputHandler: ((line: OutputLine) => void) | null;
 }
 
 function createPane(tabId: string): Pane {
@@ -19,21 +18,32 @@ function createPane(tabId: string): Pane {
     tabId,
     session: new TerminalSession(),
     terminal: null,
-    addon: null,
+    outputHandler: null,
   };
 }
 
+function disposePane(pane: Pane) {
+  if (pane.outputHandler) {
+    pane.session.offOutput(pane.outputHandler);
+    pane.outputHandler = null;
+  }
+  const terminal = pane.terminal;
+  pane.terminal = null;
+  terminal?.dispose();
+}
+
 export default function TerminalPanel() {
-  const [tabs, setTabs] = useState<Tab[]>(() => [{ id: crypto.randomUUID(), label: 'Shell 1' }]);
+  const [tabs, setTabs] = useState<Tab[]>(() => [{ id: crypto.randomUUID(), label: 'Local runtime 1' }]);
   const [activeTab, setActiveTab] = useState<string>(() => tabs[0].id);
   const [panes, setPanes] = useState<Pane[]>(() => [createPane(tabs[0].id)]);
   const [activePane, setActivePane] = useState<string>(() => panes[0].id);
   const [input, setInput] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [historyIdx, setHistoryIdx] = useState(-1);
-  const containerRef = useRef<HTMLDivElement>(null);
   const paneRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const inputRef  = useRef<HTMLInputElement>(null);
+  const panesRef = useRef(panes);
+  panesRef.current = panes;
 
   const activePaneData = panes.find(p => p.id === activePane)!;
 
@@ -42,25 +52,9 @@ export default function TerminalPanel() {
     else paneRefs.current.delete(paneId);
   }, []);
 
-  useEffect(() => {
-    const currentPane = panes.find(p => p.id === activePane);
-    if (!currentPane) return;
-    currentPane.session.init();
-  }, [activePane, panes]);
-
-  useEffect(() => {
-    const handler = (line: OutputLine) => {
-      const pane = panes.find(p => p.session === terminalSession);
-      if (pane) {
-        setPanes(prev => prev.map(p => p.id === pane.id ? { ...p, session: p.session } : p));
-      }
-    };
-    terminalSession.onOutput(handler);
-    return () => terminalSession.offOutput(handler);
-  }, [panes]);
+  useEffect(() => () => panesRef.current.forEach(disposePane), []);
 
   const initTerminal = useCallback((pane: Pane) => {
-    if (!containerRef.current) return;
     const el = paneRefs.current.get(pane.id);
     if (!el) return;
 
@@ -71,29 +65,13 @@ export default function TerminalPanel() {
       fontFamily: 'monospace',
     });
     pane.terminal = term;
-
-    const addon = new SandboxAddon({
-      getWebSocketUrl: ({ origin, sessionId }) => {
-        const wsOrigin = origin.replace(/^http/, 'ws');
-        return `${wsOrigin}/ws/terminal/${sessionId ?? 'default'}`;
-      },
-      reconnect: true,
-      onStateChange: (state, error) => {
-        if (state === 'connected') {
-          pane.session.enableSandbox({ fetch: (req: Request) => Promise.resolve(new Response('connected', { status: 200 })) }, crypto.randomUUID());
-        }
-        if (state === 'disconnected' && error) {
-          pane.session.emit({ type: 'system', text: `Terminal disconnected: ${error.message}` });
-        }
-      },
-    });
-    pane.addon = addon;
-    term.loadAddon(addon);
+    pane.outputHandler = line => {
+      if (line.text === '\x1b[2J\x1b[H') term.write(line.text);
+      else term.writeln(line.text.replace(/\r?\n/g, '\r\n'));
+    };
+    pane.session.onOutput(pane.outputHandler);
     term.open(el);
-
-    const sessionId = crypto.randomUUID();
-    addon.connect({ sandboxId: 'devnoder-default', sessionId });
-
+    void pane.session.init();
     term.focus();
   }, []);
 
@@ -105,7 +83,7 @@ export default function TerminalPanel() {
 
   const addTab = () => {
     const tabId = crypto.randomUUID();
-    const tab: Tab = { id: tabId, label: `Shell ${tabs.length + 1}` };
+    const tab: Tab = { id: tabId, label: `Local runtime ${tabs.length + 1}` };
     const pane = createPane(tabId);
     setTabs(t => [...t, tab]);
     setPanes(p => [...p, pane]);
@@ -115,6 +93,7 @@ export default function TerminalPanel() {
 
   const closeTab = (id: string) => {
     if (tabs.length === 1) return;
+    panes.filter(pane => pane.tabId === id).forEach(disposePane);
     setTabs(t => t.filter(tab => tab.id !== id));
     setPanes(p => p.filter(pane => pane.tabId !== id));
     if (activeTab === id) {
@@ -127,18 +106,17 @@ export default function TerminalPanel() {
     const currentPane = panes.find(p => p.id === activePane);
     if (!currentPane) return;
     const newPane = createPane(currentPane.tabId);
-    newPane.session = currentPane.session;
     setPanes(prev => [...prev, newPane]);
     setActivePane(newPane.id);
   };
 
   const closePane = (paneId: string) => {
-    setPanes(prev => {
-      const remaining = prev.filter(p => p.id !== paneId);
-      if (remaining.length === 0) return prev;
-      if (activePane === paneId) setActivePane(remaining[0].id);
-      return remaining;
-    });
+    const closing = panes.find(pane => pane.id === paneId);
+    const remaining = panes.filter(pane => pane.id !== paneId);
+    if (!closing || remaining.length === 0) return;
+    disposePane(closing);
+    if (activePane === paneId) setActivePane(remaining[0].id);
+    setPanes(remaining);
   };
 
   const submit = async () => {
@@ -172,6 +150,9 @@ export default function TerminalPanel() {
 
   return (
     <div className="terminal-panel" onClick={() => inputRef.current?.focus()}>
+      <div className="terminal-capability-note" role="status">
+        Local runtimes: JavaScript, Python and PHP. This is not a full shell; npm packages and native toolchains are unavailable here.
+      </div>
       {/* Tab bar */}
       <div className="terminal-tabs">
         {tabs.map(tab => (
@@ -196,7 +177,7 @@ export default function TerminalPanel() {
             onClick={() => setActivePane(pane.id)}
           >
             <div className="terminal-pane-header">
-              <span>{pane.session.constructor.name}</span>
+              <span>Local JS / Python / PHP</span>
               {currentTabPanes.length > 1 && (
                 <button className="terminal-pane-close"
                   onClick={e => { e.stopPropagation(); closePane(pane.id); }}>×</button>
@@ -216,12 +197,12 @@ export default function TerminalPanel() {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Enter command… (Ctrl+E/O to split)"
+          placeholder="Run a supported local command… (Ctrl+E/O to split)"
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}
         />
-        <button className="terminal-run-btn" onClick={submit}>▶</button>
+        <button className="terminal-run-btn" onClick={submit}>Run</button>
       </div>
     </div>
   );

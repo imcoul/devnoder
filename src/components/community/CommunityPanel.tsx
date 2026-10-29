@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { pluginAPI, Plugin } from '../../services/plugins/PluginAPI';
 import { themeRegistry, CommunityTheme } from '../../services/community/ThemeRegistry';
-import { computePool, PoolStats } from '../../services/community/ComputePool';
+import { computePool } from '../../services/community/ComputePool';
+import { AppIcon } from '../brand/AppIcon';
 import './CommunityPanel.css';
 
 type Tab = 'plugins' | 'themes' | 'compute';
@@ -28,11 +29,9 @@ export default function CommunityPanel() {
   const [registry, setRegistry]       = useState<any[]>([]);
   const [themes, setThemes]           = useState<CommunityTheme[]>([]);
   const [installedThemes, setInstalledThemes] = useState<CommunityTheme[]>([]);
-  const [poolStats, setPoolStats]     = useState<PoolStats | null>(null);
   const [themeQuery, setThemeQuery]   = useState('');
   const [themeTag, setThemeTag]       = useState('');
   const [loading, setLoading]         = useState(false);
-  const [contributing, setContributing] = useState(false);
   const [appliedTheme, setAppliedTheme] = useState<string | null>(
     () => localStorage.getItem('devnoder-community-theme')
   );
@@ -40,7 +39,6 @@ export default function CommunityPanel() {
   useEffect(() => {
     if (tab === 'plugins') loadPlugins();
     if (tab === 'themes')  loadThemes();
-    if (tab === 'compute') loadPool();
   }, [tab]);
 
   const loadPlugins = async () => {
@@ -57,11 +55,6 @@ export default function CommunityPanel() {
     ]);
     setThemes(all); setInstalledThemes(inst);
     setLoading(false);
-  };
-
-  const loadPool = async () => {
-    const stats = await computePool.getStats();
-    setPoolStats(stats);
   };
 
   const installPlugin = async (id: string) => {
@@ -92,11 +85,6 @@ export default function CommunityPanel() {
     setAppliedTheme(null);
   };
 
-  const toggleContribute = () => {
-    if (contributing) { computePool.stopContributing(); setContributing(false); }
-    else { computePool.startContributing(); setContributing(true); }
-  };
-
   const exportDataset = async () => {
     const data = await computePool.exportFineTuneDataset();
     if (!data) { alert('No rated conversations to export yet.'); return; }
@@ -112,7 +100,8 @@ export default function CommunityPanel() {
         {(['plugins', 'themes', 'compute'] as Tab[]).map(t => (
           <button key={t} className={`community-tab ${tab === t ? 'active' : ''}`}
             onClick={() => setTab(t)}>
-            {t === 'plugins' ? '🧩 Plugins' : t === 'themes' ? '🎨 Themes' : '⚙ Compute'}
+            <AppIcon name={t === 'plugins' ? 'puzzle' : t === 'themes' ? 'palette' : 'cpu'} size={16} />
+            <span>{t === 'plugins' ? 'Plugins' : t === 'themes' ? 'Themes' : 'Compute'}</span>
           </button>
         ))}
       </div>
@@ -163,8 +152,8 @@ export default function CommunityPanel() {
                 <div className="plugin-desc">{p.description}</div>
                 <div className="plugin-perms">{p.permissions.join(', ')}</div>
               </div>
-              <button className="install-btn" onClick={() => installPlugin(p.id)} disabled={loading}>
-                Install
+              <button className="install-btn" onClick={() => installPlugin(p.id)} disabled={loading || !p.entryUrl}>
+                {p.entryUrl ? 'Install' : 'Not configured'}
               </button>
             </div>
           ))}
@@ -228,43 +217,18 @@ export default function CommunityPanel() {
         <div className="community-body">
           <div className="compute-card">
             <div className="compute-card-title">Cloud Compute Pool</div>
-            <p className="compute-desc">
-              Share idle CPU cycles with the community to run builds, tests, and AI tasks.
-              Earn credits redeemable for Pro features.
-            </p>
-            {poolStats && (
-              <div className="compute-stats">
-                <div className="compute-stat">
-                  <span className="stat-val">{poolStats.activeWorkers}</span>
-                  <span className="stat-label">Active workers</span>
-                </div>
-                <div className="compute-stat">
-                  <span className="stat-val">{poolStats.queuedTasks}</span>
-                  <span className="stat-label">Queued tasks</span>
-                </div>
-                <div className="compute-stat">
-                  <span className="stat-val">{poolStats.completedToday}</span>
-                  <span className="stat-label">Done today</span>
-                </div>
-                <div className="compute-stat">
-                  <span className="stat-val">{poolStats.yourContribution}s</span>
-                  <span className="stat-label">Your contribution</span>
-                </div>
-              </div>
-            )}
-            <button className={`compute-toggle-btn ${contributing ? 'active' : ''}`}
-              onClick={toggleContribute}>
-              {contributing ? '⏹ Stop Contributing' : '▶ Start Contributing'}
-            </button>
+            <div className="compute-unavailable" role="status">
+              <strong>Community compute is not configured</strong>
+              <p>No tasks are being offered or executed, and this browser cannot contribute CPU cycles or earn credits in this release.</p>
+            </div>
           </div>
 
           <div className="compute-card">
             <div className="compute-card-title">Fine-tune Export</div>
             <p className="compute-desc">
-              Export your rated AI conversations as a JSONL dataset for fine-tuning models.
-              Only conversations you rated 4★ or 5★ are included.
+              Download a local JSONL file of conversations rated 4 or 5 stars. This exports your data only; model fine-tuning is not provided by this app.
             </p>
-            <button className="install-btn" onClick={exportDataset}>⬇ Export Dataset</button>
+            <button className="install-btn" onClick={exportDataset}><AppIcon name="download" size={15} /> Export dataset</button>
           </div>
         </div>
       )}

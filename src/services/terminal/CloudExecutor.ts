@@ -1,11 +1,6 @@
-// CloudExecutor.ts — Cloudflare Sandbox SDK integration for code execution.
-//
-// Task 1.1: Adopt @cloudflare/sandbox (Apache-2.0).
-//   - Replaces the old HTTP-only CloudExecutor with the SDK's DO-backed API.
-//   - Falls back to HTTP worker URL when Sandbox binding is absent (local dev,
-//     preview deployments without DO, or before wrangler.toml is updated).
-
-import { getSandbox, type Sandbox, type SandboxOptions, type ExecResult } from '@cloudflare/sandbox';
+// CloudExecutor.ts — browser-safe client for the optional remote executor Worker.
+// The Cloudflare Sandbox SDK is server-only and must remain inside Worker code.
+import { EXECUTOR_BASE_URL } from '../../config/serviceEndpoints';
 
 export interface CloudResult {
   stdout: string;
@@ -14,38 +9,24 @@ export interface CloudResult {
   runtime: string;
 }
 
-const FALLBACK_WORKER_URL = 'https://devnoder-executor.srvel-build.workers.dev';
-const DEFAULT_SANDBOX_ID = 'devnoder-default';
-const DEFAULT_SESSION_ID = 'default';
+interface ExecutorHealth {
+  status?: string;
+  configured?: boolean;
+  capabilities?: { execute?: boolean; tunnel?: boolean };
+}
 
 export const cloudExecutor = {
   available: false,
   lastChecked: 0,
-  sandboxReady: false as boolean,
-  sandboxInstance: null as Sandbox | null,
-
-  /** Detect whether the Sandbox DO binding is available at runtime. */
-  hasBinding(env: unknown): boolean {
-    if (typeof env !== 'object' || env === null) return false;
-    const candidate = (env as Record<string, unknown>).Sandbox;
-    return !!candidate && typeof (candidate as Record<string, unknown>).idFromName === 'function' && typeof (candidate as Record<string, unknown>).get === 'function';
-  },
-
-  /** Initialize the sandbox from a Cloudflare env binding. */
-  initSandbox(env: Record<string, unknown>, options?: SandboxOptions) {
-    this.sandboxInstance = getSandbox(env.Sandbox as any, DEFAULT_SANDBOX_ID, options);
-    this.sandboxReady = true;
-  },
 
   async checkAvailability(): Promise<boolean> {
-    if (this.sandboxReady) {
-      this.available = true;
-      this.lastChecked = Date.now();
-      return true;
-    }
     try {
-      const res = await fetch(`${FALLBACK_WORKER_URL}/health`, { signal: AbortSignal.timeout(3000) });
-      this.available = res.ok;
+      const response = await fetch(`${EXECUTOR_BASE_URL}/health`, { signal: AbortSignal.timeout(3000) });
+      const health = response.ok ? await response.json() as ExecutorHealth : null;
+      this.available = response.ok
+        && health?.status === 'ok'
+        && health.configured === true
+        && health.capabilities?.execute === true;
     } catch {
       this.available = false;
     }
@@ -58,62 +39,55 @@ export const cloudExecutor = {
     return this.available;
   },
 
-  async run(code: string, language: string, timeout = 10000): Promise<CloudResult> {
-    if (this.sandboxReady && this.sandboxInstance) {
-      try {
-        const result: ExecResult = await this.sandboxInstance.exec(code, { timeout });
-        return {
-          stdout: result.stdout ?? '',
-          stderr: result.stderr ?? '',
-          exitCode: result.exitCode ?? 0,
-          runtime: language,
-        };
-      } catch (e: unknown) {
-        const message = e instanceof Error ? e.message : String(e);
-        return { stdout: '', stderr: message, exitCode: 1, runtime: language };
-      }
-    }
-    await this.ensureFresh();
-    if (!this.available) {
-      return { stdout: '', stderr: 'Cloud executor not deployed.', exitCode: 1, runtime: language };
+  async run(code: string, language: string, timeout = 10_000): Promise<CloudResult> {
+    if (!await this.ensureFresh()) {
+      return { stdout: '', stderr: 'Remote executor is not configured or does not advertise execute capability.', exitCode: 1, runtime: language };
     }
     try {
-      const res = await fetch(`${FALLBACK_WORKER_URL}/execute`, {
+      const response = await fetch(`${EXECUTOR_BASE_URL}/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, language }),
         signal: AbortSignal.timeout(timeout),
       });
-      return res.ok ? (await res.json()) : { stdout: '', stderr: `HTTP ${res.status}`, exitCode: 1, runtime: language };
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : String(e);
+      if (!response.ok) {
+        if ([401, 403, 404, 501].includes(response.status)) {
+          this.available = false;
+          this.lastChecked = Date.now();
+        }
+        return { stdout: '', stderr: `HTTP ${response.status}`, exitCode: 1, runtime: language };
+      }
+      const result = await response.json() as Partial<CloudResult>;
+      return {
+        stdout: result.stdout ?? '',
+        stderr: result.stderr ?? '',
+        exitCode: result.exitCode ?? 0,
+        runtime: result.runtime ?? language,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       return { stdout: '', stderr: message, exitCode: 1, runtime: language };
     }
   },
 
   async tunnel(port: number): Promise<string> {
-    if (this.sandboxReady && this.sandboxInstance) {
-      try {
-        const tunnel = await this.sandboxInstance.tunnels.get(port);
-        return tunnel.url ?? '';
-      } catch {
-        return '';
-      }
-    }
+    if (!await this.ensureFresh()) return '';
     try {
-      const res = await fetch(`${FALLBACK_WORKER_URL}/tunnel`, {
+      const response = await fetch(`${EXECUTOR_BASE_URL}/tunnel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ port }),
+        signal: AbortSignal.timeout(5000),
       });
-      const data = await res.json();
+      if (!response.ok) return '';
+      const data = await response.json() as { url?: string };
       return data.url ?? '';
     } catch {
       return '';
     }
   },
 
-  setAvailable(v: boolean) {
-    this.available = v;
+  setAvailable(value: boolean) {
+    this.available = value;
   },
 };

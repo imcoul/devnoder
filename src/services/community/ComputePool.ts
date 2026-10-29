@@ -1,5 +1,7 @@
 // ComputePool.ts — community compute sharing via Cloudflare Workers
-const POOL_WORKER = 'https://devnoder-executor.srvel-build.workers.dev/pool';
+import { EXECUTOR_BASE_URL } from '../../config/serviceEndpoints';
+
+const POOL_WORKER = `${EXECUTOR_BASE_URL}/pool`;
 
 export interface PoolTask {
   id: string;
@@ -63,10 +65,7 @@ class ComputePool {
   }
 
   startContributing(): void {
-    if (this.contributing) return;
-    this.contributing = true;
-    // In prod: spawn a Web Worker that polls for tasks and executes them via WASM
-    console.log('ComputePool: contributing idle cycles');
+    throw new Error('Community compute is not configured in this release; no work will be run in this browser.');
   }
 
   stopContributing(): void {

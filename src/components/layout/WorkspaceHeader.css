@@ -1,0 +1,30 @@
+.workspace-header {
+  min-block-size: 3.5rem;
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  padding: .55rem .8rem;
+  background: var(--color-surface);
+  border-block-end: 1px solid var(--color-border);
+  position: relative;
+  z-index: 5;
+}
+.workspace-header__brand { flex: 0 0 auto; display: flex; align-items: center; }
+.workspace-header__project { min-inline-size: 0; display: flex; flex-direction: column; gap: .05rem; }
+.workspace-header__project-label { color: var(--color-text-muted); font-size: .65rem; text-transform: uppercase; letter-spacing: .1em; }
+.workspace-header__project strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 .92rem var(--font-display); }
+.workspace-header__actions { margin-inline-start: auto; display: flex; align-items: center; gap: .35rem; }
+.workspace-header__local-status { display: inline-flex; align-items: center; gap: .35rem; color: var(--color-text-muted); font-size: .72rem; white-space: nowrap; }
+.workspace-header__status-dot { inline-size: .45rem; block-size: .45rem; border-radius: 50%; background: var(--color-success); }
+.workspace-header button { min-block-size: 2.5rem; display: inline-flex; align-items: center; justify-content: center; gap: .35rem; padding: .45rem .65rem; border: 1px solid var(--color-border); border-radius: var(--radius); color: var(--color-text); background: transparent; cursor: pointer; }
+.workspace-header button:hover:not(:disabled) { border-color: var(--color-turquoise); color: var(--color-turquoise); }
+.workspace-header button:disabled { opacity: .6; cursor: wait; }
+.workspace-header__backup { color: var(--color-yellow) !important; }
+.workspace-header__message { position: absolute; inset-inline-end: .8rem; inset-block-end: -.1rem; transform: translateY(100%); padding: .25rem .5rem; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); color: var(--color-text-muted); font-size: .7rem; }
+@media (max-width: 42rem) {
+  .workspace-header { gap: .55rem; padding-inline: .55rem; }
+  .workspace-header__local-status { font-size: 0; gap: 0; }
+  .workspace-header__local-status .workspace-header__status-dot { inline-size: .55rem; block-size: .55rem; }
+  .workspace-header button span { display: none; }
+  .workspace-header button { inline-size: 2.5rem; padding: .45rem; }
+}

@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "typecheck": "tsc -b --pretty false",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "lint": "eslint src",
     "deploy": "wrangler deploy"
   },
@@ -29,6 +31,9 @@
     "@codemirror/legacy-modes": "^6.5.3",
     "@codemirror/state": "^6.7.0",
     "@codemirror/view": "^6.43.3",
+    "@fontsource/instrument-sans": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/livvic": "^5.3.0",
     "@hocuspocus/server": "^4.7.0",
     "@huggingface/transformers": "^4.2.0",
     "@isomorphic-git/lightning-fs": "^4.6.2",
@@ -37,6 +42,7 @@
     "@mlc-ai/web-llm": "^0.2.84",
     "@modelcontextprotocol/sdk": "^1.30.1",
     "@nanostores/react": "^1.1.0",
+    "@phosphor-icons/react": "^2.1.10",
     "@php-wasm/web": "^3.1.42",
     "@sentry/react": "^11.2.0",
     "@sentry/tracing": "^7.120.4",
@@ -45,13 +51,13 @@
     "buffer": "^6.0.3",
     "codemirror": "^6.0.2",
     "dexie": "^4.4.4",
+    "fflate": "^0.8.3",
     "grapesjs": "^0.23.2",
     "grapesjs-preset-webpage": "^1.0.3",
     "i18next": "^26.3.3",
     "i18next-browser-languagedetector": "^8.2.1",
     "isomorphic-git": "^1.38.5",
     "jsdiff": "^1.1.1",
-    "litellm": "^0.12.0",
     "nanostores": "^1.3.0",
     "pyodide": "^314.0.1",
     "qrcode-svg": "^1.1.0",
@@ -71,23 +77,26 @@
     "protobufjs@7.6.4": true
   },
   "overrides": {
-    "fast-uri": "3.1.6",
+    "fast-uri": "3.1.9",
+    "zod": "4.6.6",
     "nanoid": "3.3.18"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260804.1",
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.2.0",
+    "@vitest/coverage-v8": "^5.0.5",
     "eslint": "^10.9.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "fake-indexeddb": "^6.2.5",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.69.0",
-    "vite": "^6.3.7",
+    "vite": "^6.4.5",
     "vite-plugin-pwa": "^1.3.0",
-    "vitest": "^5.0.0",
-    "wrangler": "^4.129.0"
+    "vitest": "^5.0.5",
+    "wrangler": "^4.145.0"
   }
 }

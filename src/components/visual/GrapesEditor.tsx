@@ -3,6 +3,7 @@ import { useStore } from '@nanostores/react';
 import { $buffers, $activeBuffer } from '../../services/editor/BufferManager';
 import { codeSyncEngine } from '../../services/visual/CodeSyncEngine';
 import { checkAccessibility, A11yIssue } from '../../services/visual/AccessibilityChecker';
+import { AppIcon } from '../brand/AppIcon';
 import './GrapesEditor.css';
 
 export default function GrapesEditor() {
@@ -35,7 +36,8 @@ export default function GrapesEditor() {
               { name: 'Mobile',  width: '390px' },
             ],
           },
-          canvas: { styles: ['https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap'] },
+          // Respect the project's own styles; never fetch UI fonts implicitly.
+          canvas: { styles: [] },
         });
 
         gjsRef.current = gjs;
@@ -93,7 +95,7 @@ export default function GrapesEditor() {
         {(['desktop', 'tablet', 'mobile'] as const).map(bp => (
           <button key={bp} className={`bp-btn ${breakpoint === bp ? 'active' : ''}`}
             onClick={() => setDevice(bp)} aria-label={`${bp} view`}>
-            {bp === 'desktop' ? '🖥' : bp === 'tablet' ? '📱' : '📲'}
+            <AppIcon name={bp === 'desktop' ? 'preview' : 'visual'} size={20} />
           </button>
         ))}
         <div className="grapes-spacer" />

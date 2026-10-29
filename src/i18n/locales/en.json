@@ -11,6 +11,10 @@
     "api": "API",
     "health": "Health",
     "settings": "Settings",
+    "community": "Community",
+    "plugins": "Plugins",
+    "billing": "Billing",
+    "about": "About",
     "feedback": "AI Feedback",
     "mcp": "MCP Servers",
     "skills": "Skills"

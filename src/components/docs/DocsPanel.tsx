@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { offlineDocsService, DocSource, DocPage } from '../../services/docs/OfflineDocsService';
+import { AppIcon } from '../brand/AppIcon';
 import './DocsPanel.css';
 
 export default function DocsPanel() {
@@ -78,7 +79,7 @@ export default function DocsPanel() {
               onKeyDown={e => e.key === 'Enter' && search()}
             />
             <button className="docs-search-btn" onClick={search} disabled={searching}>
-              {searching ? '…' : '🔍'}
+              {searching ? '…' : <AppIcon name="search" size={16} />}
             </button>
           </div>
 
@@ -87,7 +88,7 @@ export default function DocsPanel() {
             {selected.cached ? (
               <>
                 <span className="docs-cache-status">
-                  ✅ Cached offline {selected.cacheSize ? `(${offlineDocsService.formatCacheSize(selected.cacheSize)})` : ''}
+                  <><AppIcon name="check" size={15} /> Cached offline {selected.cacheSize ? `(${offlineDocsService.formatCacheSize(selected.cacheSize)})` : ''}</>
                 </span>
                 <button className="docs-cache-btn docs-cache-btn--clear"
                   onClick={() => handleClear(selected)}>
@@ -102,7 +103,7 @@ export default function DocsPanel() {
                   onClick={() => handleCache(selected)}
                   disabled={caching === selected.id}
                 >
-                  {caching === selected.id ? `Caching… ${cacheProgress}` : '⬇ Cache Offline'}
+                  {caching === selected.id ? `Caching… ${cacheProgress}` : <><AppIcon name="download" size={15} /> Cache Offline</>}
                 </button>
               </>
             )}
@@ -116,7 +117,7 @@ export default function DocsPanel() {
                 <p>Search {selected.name} above, or</p>
                 <a href={selected.baseUrl} target="_blank" rel="noopener noreferrer"
                   className="docs-open-link">
-                  Open {selected.name} ↗
+                  Open {selected.name} <AppIcon name="external" size={14} />
                 </a>
               </div>
             )}

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="The DevNoder guide explains supported browser files, preview formats, project storage, backup, GitHub, and AI runtime limits." />
+    <link rel="canonical" href="https://devnoder.srvel.net/guide/" />
+    <link rel="icon" type="image/png" href="https://devnoder.srvel.net/icons/devnoder-mark.png" />
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="DevNoder" />
+    <meta property="og:title" content="DevNoder guide — supported workflows and limits" />
+    <meta property="og:description" content="Learn what runs in the browser, what needs a network or provider, and how to protect local project data." />
+    <meta property="og:url" content="https://devnoder.srvel.net/guide/" />
+    <meta property="og:image" content="https://devnoder.srvel.net/icons/devnoder-mark.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="DevNoder guide — supported workflows and limits" />
+    <meta name="twitter:description" content="Supported files, preview, storage, backup, GitHub, and AI boundaries." />
+    <meta name="twitter:image" content="https://devnoder.srvel.net/icons/devnoder-mark.png" />
+    <title>DevNoder guide — supported workflows and limits</title>
+    <style>
+      :root{color-scheme:dark;font-family:system-ui,sans-serif;background:#0d1f1e;color:#f0f6fc}body{max-width:58rem;margin:0 auto;padding:2rem 1.1rem;line-height:1.65}a{color:#40e0d0}h1,h2{font-family:Arial,sans-serif;line-height:1.15}h1{font-size:clamp(2rem,6vw,3.4rem);margin-block:1rem}h2{margin-block-start:2rem;color:#c8b4ff}header{border-block-end:1px solid #2a3f3d;padding-block-end:1rem}section{max-width:70ch}code{font-family:ui-monospace,monospace;color:#ffff80}li{margin-block:.45rem}.note{border-inline-start:3px solid #40e0d0;padding-inline-start:1rem;color:#c8e6e4}nav{display:flex;gap:1rem;flex-wrap:wrap}
+    </style>
+  </head>
+  <body>
+    <header><nav><a href="/">DevNoder</a><a href="/about/">About</a></nav><h1>DevNoder guide</h1><p>Edit useful browser projects, see a supported preview, and keep a recoverable local copy.</p></header>
+    <main>
+      <section><h2>What runs here</h2><p>DevNoder is a static web application. Project files are edited in the browser. The clearest supported loop is HTML, CSS, and classic JavaScript: create or import a project, open its first file, edit it, preview the result, and export a ZIP backup.</p><p>Preview is not a general package manager or native build environment. Arbitrary npm modules, framework compilers, native SDKs, and device-specific toolchains are not implied by a file being editable.</p></section>
+      <section><h2>Projects and formats</h2><ul><li>Browser files such as <code>.html</code>, <code>.css</code>, <code>.js</code>, <code>.json</code>, and other editor-supported text files can be stored and edited.</li><li>Visual editing and other panels may support narrower formats; their status should be treated as capability-specific rather than universal.</li><li>Static preview is intended for browser-runnable content. Imports that require a server, native binary, package install, or private backend need that environment outside this app.</li></ul></section>
+      <section><h2>Storage and recovery</h2><p>Project data is kept in browser-local storage for this app. Clearing site data, changing browser profiles, or storage pressure can remove access to local work. Export a ZIP backup before clearing data or moving devices, and keep important backups somewhere outside the browser. DevNoder does not promise automatic recovery of cleared local storage.</p></section>
+      <section><h2>GitHub</h2><p>The Git panel can save a repository origin and use a GitHub personal access token for the supported remote operations. Token material is kept in the existing encrypted browser-local storage path; it is not stored as a plain <code>devnoder-gh-token</code> value. Network access, repository permissions, and GitHub availability still apply. Disconnect removes the stored token.</p></section>
+      <section><h2>AI setup</h2><p>AI setup is in one AI workspace. DevNoder exposes supported local WebLLM and Transformers.js/ONNX paths where the selected model and browser runtime are compatible, along with configured provider routes when available. Model downloads can require network access, storage, memory, and time; provider calls can require a key, network access, quota, and the provider's own policy.</p><p>Model quality and device compatibility vary. DevNoder does not claim that arbitrary GGUF files, every model, or native inference can run in this browser.</p></section>
+      <section><h2>Development</h2><p>Clone the repository from <a href="https://github.com/imcoul/devnoder/tree/codex/repair-first-project">GitHub</a>, install the pinned Node dependencies, and use <code>npm run dev</code> for local work. The supported checks include <code>npm run typecheck</code>, <code>npm test</code>, and the project’s Playwright flows when their environment is available. Production publishing is controlled by the live deployment branch; do not treat a local build as a deployment.</p></section>
+      <p class="note">If you are unsure whether a workflow is supported, look for an explicit capability state in the app and keep an exportable backup. “Editable” does not mean “runs here.”</p>
+    </main>
+  </body>
+</html>

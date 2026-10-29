@@ -14,3 +14,6 @@ dist
 # Local tooling and OS files.
 .DS_Store
 tsconfig.tsbuildinfo
+coverage/
+test-results/
+playwright-report/

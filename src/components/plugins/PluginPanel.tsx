@@ -3,6 +3,7 @@
 // independently of the full Community panel.
 import React, { useState, useEffect } from 'react';
 import { pluginAPI, Plugin } from '../../services/plugins/PluginAPI';
+import { AppIcon } from '../brand/AppIcon';
 import '../community/CommunityPanel.css';
 
 export default function PluginPanel() {
@@ -37,7 +38,7 @@ export default function PluginPanel() {
     <div className="community-panel">
       <div style={{ padding:'0.5rem 0.7rem', fontWeight:700, fontSize:'0.9rem',
         background:'var(--color-surface)', borderBlockEnd:'1px solid var(--color-border)' }}>
-        🧩 Plugins
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}><AppIcon name="puzzle" size={16} /> Plugins</span>
       </div>
       <div role="note" style={{ padding:'0.4rem 0.7rem', fontSize:'0.72rem', lineHeight:1.4,
         color:'var(--color-text-muted)', background:'var(--color-surface)',
@@ -58,7 +59,7 @@ export default function PluginPanel() {
                 </div>
                 <div className="plugin-actions">
                   <label className="plugin-toggle">
-                    <input type="checkbox" checked={p.enabled}
+                    <input type="checkbox" checked={p.enabled} disabled={!p.entryUrl}
                       onChange={e => toggle(p.id, e.target.checked)} />
                     <span className="toggle-track" />
                   </label>
@@ -79,8 +80,8 @@ export default function PluginPanel() {
               <div className="plugin-desc">{p.description}</div>
               <div className="plugin-perms">{p.permissions.join(', ')}</div>
             </div>
-            <button className="install-btn" onClick={() => install(p.id)} disabled={loading}>
-              Install
+            <button className="install-btn" onClick={() => install(p.id)} disabled={loading || !p.entryUrl} title={!p.entryUrl ? 'No verified plugin artifact is configured' : undefined}>
+              {p.entryUrl ? 'Install' : 'Not configured'}
             </button>
           </div>
         ))}

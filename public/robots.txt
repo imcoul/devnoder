@@ -1,0 +1,8 @@
+User-agent: *
+Disallow: /
+Allow: /$
+Allow: /guide/
+Allow: /about/
+Allow: /icons/
+
+Sitemap: https://devnoder.srvel.net/sitemap.xml

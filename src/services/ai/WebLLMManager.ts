@@ -4,54 +4,197 @@ import type { MCPTool } from './MCPConfigStore';
 
 type StreamHandler = (chunk: StreamChunk) => void;
 
+export type LocalModelPreparationState = 'not-prepared' | 'downloading' | 'ready-in-tab';
+export interface ActiveLocalRuntimeInfo {
+  runtime: 'WebLLM / WebGPU' | 'Transformers.js / WASM';
+  artifactId: string;
+  dtype?: string;
+}
+
 class WebLLMManager {
   private engine: any = null;
   private currentModelId = '';
+  private currentArtifactId = '';
+  private currentDtype: string | undefined;
   private loadingProgress = 0;
-  private onProgressCbs: Array<(p: number, label: string) => void> = [];
+  private onProgressCbs = new Set<(p: number, label: string, modelId: string) => void>();
   private useTransformers = false;
   private tfPipeline: any = null;
+  private loadingPromise: Promise<void> | null = null;
+  private loadingModelId = '';
 
-  onProgress(cb: (p: number, label: string) => void) { this.onProgressCbs.push(cb); }
+  onProgress(cb: (p: number, label: string, modelId: string) => void) {
+    this.onProgressCbs.add(cb);
+    return () => { this.onProgressCbs.delete(cb); };
+  }
   getProgress() { return this.loadingProgress; }
 
-  private emitProgress(p: number, label: string) {
-    this.loadingProgress = p;
-    this.onProgressCbs.forEach(cb => cb(p, label));
+  getPreparationState(modelId: string): LocalModelPreparationState {
+    if (this.currentModelId === modelId && (this.engine || this.tfPipeline)) return 'ready-in-tab';
+    if (this.loadingModelId === modelId && this.loadingPromise) return 'downloading';
+    return 'not-prepared';
+  }
+
+  getActiveRuntimeInfo(modelId: string): ActiveLocalRuntimeInfo | null {
+    if (this.currentModelId !== modelId) return null;
+    if (this.engine) return { runtime: 'WebLLM / WebGPU', artifactId: this.currentArtifactId };
+    if (this.tfPipeline) return {
+      runtime: 'Transformers.js / WASM', artifactId: this.currentArtifactId,
+      ...(this.currentDtype ? { dtype: this.currentDtype } : {}),
+    };
+    return null;
+  }
+
+  private emitProgress(p: number, label: string, modelId = this.loadingModelId || this.currentModelId) {
+    this.loadingProgress = Math.max(0, Math.min(100, Number.isFinite(p) ? p : 0));
+    this.onProgressCbs.forEach(cb => cb(this.loadingProgress, label, modelId));
   }
 
   async load(modelId: string): Promise<void> {
     if (this.currentModelId === modelId && (this.engine || this.tfPipeline)) return;
+    if (this.loadingPromise) {
+      if (this.loadingModelId === modelId) return this.loadingPromise;
+      throw new Error('Another local model is currently loading. Wait for it to finish before switching models.');
+    }
+    if (this.currentModelId && (this.engine || this.tfPipeline)) await this.unload();
 
-    if ('gpu' in navigator) {
+    this.loadingModelId = modelId;
+    const task = this.loadModel(modelId);
+    this.loadingPromise = task;
+    try {
+      await task;
+    } finally {
+      if (this.loadingPromise === task) {
+        this.loadingPromise = null;
+        this.loadingModelId = '';
+      }
+    }
+  }
+
+  private async loadModel(modelId: string): Promise<void> {
+    const { aiGateway } = await import('./AIGateway');
+    const model = aiGateway.getModels().find(candidate => candidate.id === modelId);
+    if (!model?.offlineCapable) throw new Error(`Unknown on-device model: ${modelId}`);
+    const webgpuAvailable = typeof navigator !== 'undefined' && 'gpu' in navigator;
+
+    if (webgpuAvailable && model.provider === 'webllm') {
       try {
-        const { CreateMLCEngine } = await import('@mlc-ai/web-llm');
-        this.engine = await CreateMLCEngine(modelId, {
+        const { CreateMLCEngine, prebuiltAppConfig } = await import('@mlc-ai/web-llm');
+        if (!prebuiltAppConfig.model_list.some(entry => entry.model_id === modelId && (entry.model_type == null || entry.model_type === 0))) {
+          throw new Error('This model is not in the installed WebLLM prebuilt registry.');
+        }
+        const engine = await CreateMLCEngine(modelId, {
           initProgressCallback: (info: any) => {
-            this.emitProgress(Math.round((info.progress ?? 0) * 100), info.text ?? 'Loading…');
+            this.emitProgress(Math.round((info.progress ?? 0) * 100), info.text ?? 'Downloading model files…', modelId);
           },
         });
+        this.engine = engine;
+        this.tfPipeline = null;
         this.currentModelId = modelId;
+        this.currentArtifactId = modelId;
+        this.currentDtype = undefined;
         this.useTransformers = false;
         return;
       } catch (e) {
-        console.warn('WebLLM WebGPU failed, falling back to Transformers.js', e);
+        this.engine = null;
+        if (!model.transformersModelId) {
+          const reason = e instanceof Error ? ` (${e.message})` : '';
+          throw new Error(`${model.label} could not load with WebGPU${reason}. Try Qwen 0.5B (local), the supported WASM model.`, { cause: e });
+        }
       }
     }
 
-    // Transformers.js WASM fallback
+    // Only use a fallback whose exact model repository is declared by the
+    // selected catalog entry. Never run a different model under its label.
+    if (!model.transformersModelId) {
+      throw new Error(`${model.label} requires a compatible WebGPU device. Choose Qwen 0.5B (local) for the supported WASM fallback.`);
+    }
+
     this.useTransformers = true;
-    this.emitProgress(10, 'Loading Transformers.js…');
+    this.engine = null;
+    this.emitProgress(0, 'Preparing the supported Transformers.js model…', modelId);
     const { pipeline } = await import('@huggingface/transformers');
-    this.emitProgress(30, 'Downloading model weights…');
-    this.tfPipeline = await pipeline('text-generation', 'Xenova/Qwen2.5-Coder-0.5B-Instruct', {
+    this.emitProgress(5, 'Downloading model files from Hugging Face…', modelId);
+    const loadedPipeline = await pipeline('text-generation', model.transformersModelId, {
+      ...(model.transformersDtype ? { dtype: model.transformersDtype } : {}),
       progress_callback: (info: any) => {
-        if (info.status === 'progress')
-          this.emitProgress(30 + Math.round(info.progress * 0.6), `Downloading ${info.file}…`);
+        if (info.status === 'progress') {
+          // Transformers.js reports percentages (0..100), not fractions.
+          const progress = Number.isFinite(info.progress) ? Math.round(5 + info.progress * 0.85) : 5;
+          const file = typeof info.file === 'string' ? info.file : 'model files';
+          this.emitProgress(progress, `Downloading ${file}…`, modelId);
+        } else if (info.status === 'done') {
+          this.emitProgress(92, 'Model files cached; initializing runtime…', modelId);
+        }
       },
     });
-    this.emitProgress(100, 'Ready');
+    this.tfPipeline = loadedPipeline;
+    this.emitProgress(100, 'Ready in this tab', modelId);
     this.currentModelId = modelId;
+    this.currentArtifactId = model.transformersModelId;
+    this.currentDtype = model.transformersDtype;
+  }
+
+  isLoadedFor(modelId: string): boolean {
+    return this.currentModelId === modelId && !!(this.engine || this.tfPipeline);
+  }
+
+  async hasCachedModelFiles(modelId: string): Promise<boolean | null> {
+    const { aiGateway } = await import('./AIGateway');
+    const model = aiGateway.getModels().find(candidate => candidate.id === modelId);
+    if (!model?.offlineCapable) return null;
+    let found = false;
+    let inspected = false;
+
+    if (model.provider === 'webllm') {
+      try {
+        const { hasModelInCache } = await import('@mlc-ai/web-llm');
+        found = await hasModelInCache(modelId);
+        inspected = true;
+      } catch {
+        // Cache backend can be unavailable in private browsing or restricted contexts.
+      }
+    }
+
+    if (model.transformersModelId && typeof caches !== 'undefined') {
+      try {
+        const { env } = await import('@huggingface/transformers');
+        if (env.useBrowserCache) {
+          const cache = await caches.open(env.cacheKey);
+          const repoPath = `/${model.transformersModelId}/resolve/`;
+          const keys = await cache.keys();
+          found = found || keys.some(request => new URL(request.url).pathname.includes(repoPath));
+          inspected = true;
+        }
+      } catch {
+        // Cache inspection is best-effort; a successful model load remains authoritative.
+      }
+    }
+    return inspected ? found : null;
+  }
+
+  async deleteCachedModelFiles(modelId: string): Promise<void> {
+    if (this.loadingModelId === modelId) throw new Error('Wait for the model download to finish before clearing its cache.');
+    if (this.currentModelId === modelId) await this.unload();
+    const { aiGateway } = await import('./AIGateway');
+    const model = aiGateway.getModels().find(candidate => candidate.id === modelId);
+    if (!model?.offlineCapable) throw new Error(`Unknown on-device model: ${modelId}`);
+
+    if (model.provider === 'webllm') {
+      const { deleteModelInCache } = await import('@mlc-ai/web-llm');
+      await deleteModelInCache(modelId);
+    }
+
+    if (model.transformersModelId && typeof caches !== 'undefined') {
+      const { env } = await import('@huggingface/transformers');
+      if (env.useBrowserCache) {
+        const cache = await caches.open(env.cacheKey);
+        const repoPath = `/${model.transformersModelId}/resolve/`;
+        const keys = await cache.keys();
+        await Promise.all(keys.filter(request => new URL(request.url).pathname.includes(repoPath))
+          .map(request => cache.delete(request)));
+      }
+    }
   }
 
   // ── Tool calling via prompt injection for local models ────────────────────
@@ -87,9 +230,26 @@ class WebLLMManager {
       : messages;
 
     if (this.useTransformers && this.tfPipeline) {
-      const prompt = augmented.map(m => `${m.role}: ${m.content}`).join('\n') + '\nassistant:';
-      const result = await this.tfPipeline(prompt, { max_new_tokens: 512 });
-      const text   = (result[0]?.generated_text ?? '').split('assistant:').pop()?.trim() ?? '';
+      const chat = augmented.map(m => ({ role: m.role, content: m.content }));
+      let result: any;
+      let rawPrompt = '';
+      if (signal?.aborted) { onChunk({ delta: '', done: true }); return; }
+      try {
+        result = await this.tfPipeline(chat, { max_new_tokens: 512, do_sample: false });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!/chat.?template|apply_chat_template/i.test(message)) throw error;
+        const prompt = augmented.map(m => `${m.role}: ${m.content}`).join('\n') + '\nassistant:';
+        rawPrompt = prompt;
+        result = await this.tfPipeline(prompt, { max_new_tokens: 512, do_sample: false });
+      }
+      const generated = result[0]?.generated_text;
+      const finalMessage = Array.isArray(generated) ? generated.at(-1) : generated;
+      const text = typeof finalMessage === 'string'
+        ? (rawPrompt && finalMessage.startsWith(rawPrompt) ? finalMessage.slice(rawPrompt.length) : finalMessage).trim()
+        : typeof finalMessage?.content === 'string'
+          ? finalMessage.content.trim()
+          : '';
 
       const toolCall = this.parseToolCall(text);
       if (toolCall && tools.length) {
@@ -97,12 +257,8 @@ class WebLLMManager {
         return;
       }
 
-      const words = text.split(' ');
-      for (const word of words) {
-        if (signal?.aborted) break;
-        onChunk({ delta: word + ' ', done: false });
-        await new Promise(r => setTimeout(r, 20));
-      }
+      // Return actual completed WASM output; do not simulate token streaming.
+      if (!signal?.aborted) onChunk({ delta: text, done: false });
       onChunk({ delta: '', done: true });
       return;
     }
@@ -153,45 +309,17 @@ class WebLLMManager {
   }
 
   isLoaded() { return !!(this.engine || this.tfPipeline); }
-  unload()   { this.engine = null; this.tfPipeline = null; this.currentModelId = ''; }
-
-  /** Sprint 15 — register a custom fine-tuned model from HuggingFace URL */
-  async addCustomModel(url: string, label: string): Promise<void> {
-    const { MODELS } = await import('./AIGateway');
-    const id = `custom-${Date.now()}`;
-    (MODELS as any).push({
-      id, label: `${label} (Custom)`, provider: 'webllm',
-      contextWindow: 32768, free: true, offlineCapable: true, supportsTools: true,
-    });
-    // Persist
-    const stored = JSON.parse(localStorage.getItem('devnoder-custom-models') ?? '[]');
-    stored.push({ id, url, label });
-    localStorage.setItem('devnoder-custom-models', JSON.stringify(stored));
-    // Pre-register with WebLLM engine registry
-    try {
-      const { prebuiltAppConfig } = await import('@mlc-ai/web-llm');
-      if (prebuiltAppConfig?.model_list) {
-        prebuiltAppConfig.model_list.push({
-          model: url, model_id: id, model_lib: url.replace('.gguf', '-ctx4k_cs1k-webgpu.wasm'),
-        });
-      }
-    } catch { /* webllm not loaded yet */ }
-  }
-
-  loadCustomModels(): void {
-    try {
-      const stored = JSON.parse(localStorage.getItem('devnoder-custom-models') ?? '[]');
-      for (const m of stored) {
-        import('./AIGateway').then(({ MODELS }) => {
-          if (!(MODELS as any).find((x: any) => x.id === m.id)) {
-            (MODELS as any).push({
-              id: m.id, label: `${m.label} (Custom)`, provider: 'webllm',
-              contextWindow: 32768, free: true, offlineCapable: true, supportsTools: true,
-            });
-          }
-        });
-      }
-    } catch { /* ignore */ }
+  async unload(): Promise<void> {
+    if (this.loadingPromise) throw new Error('Wait for the model loading operation to finish before unloading.');
+    if (this.engine?.unload) await this.engine.unload();
+    if (this.tfPipeline?.dispose) await this.tfPipeline.dispose();
+    this.engine = null;
+    this.tfPipeline = null;
+    this.currentModelId = '';
+    this.currentArtifactId = '';
+    this.currentDtype = undefined;
+    this.useTransformers = false;
+    this.loadingProgress = 0;
   }
 }
 

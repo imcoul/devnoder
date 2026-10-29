@@ -15,15 +15,17 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm ci
-      - run: npx tsc -b
+      - run: npm run typecheck
       - run: npm run lint
       - run: npm run test
       - run: npm run build
       - name: Deploy to Cloudflare Pages
-        if: github.ref == 'refs/heads/main'
-        uses: cloudflare/pages-action@v1
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: devnoder
-          directory: dist
+        if: github.ref == 'refs/heads/main' && vars.CLOUDFLARE_PAGES_PROJECT != ''
+        run: npx wrangler pages deploy dist --project-name "$CLOUDFLARE_PAGES_PROJECT" --branch main
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+      - name: Report Pages deployment is not configured
+        if: github.ref == 'refs/heads/main' && vars.CLOUDFLARE_PAGES_PROJECT == ''
+        run: echo '::warning title=Pages deployment not configured::Create the Pages project and set the CLOUDFLARE_PAGES_PROJECT repository variable before release.'

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { feedbackStore, FeedbackEntry, Rating } from '../../services/ai/FeedbackStore';
 import { finetuneExport, ExportFormat, ExportStats } from '../../services/community/FinetuneExport';
 import { showToast } from '../../stores/ui';
+import { AppIcon } from '../brand/AppIcon';
 import './FeedbackPanel.css';
 
 const RATING_ICONS: Record<Rating, string> = { good: '👍', bad: '👎', edited: '✏️' };
@@ -77,7 +78,7 @@ export default function FeedbackPanel() {
     <div className="feedback-panel">
       {/* Zero-telemetry header */}
       <div className="feedback-trust-bar">
-        <span className="feedback-trust-icon">🔒</span>
+        <AppIcon name="lock" size={16} className="feedback-trust-icon" />
         <span>Your AI stays yours — all feedback stored locally, never transmitted</span>
       </div>
 
@@ -100,7 +101,7 @@ export default function FeedbackPanel() {
           ))}
         </select>
         <button className="feedback-export-btn" onClick={doExport} disabled={exporting || entries.length === 0}>
-          {exporting ? 'Exporting…' : '⬇ Export'}
+          {exporting ? 'Exporting…' : <><AppIcon name="download" size={16} /> Export</>}
         </button>
         {entries.length > 0 && (
           <button className="feedback-clear-btn" onClick={doClear}>Clear all</button>
@@ -122,12 +123,11 @@ export default function FeedbackPanel() {
             <button onClick={() => setShowGuide(false)}>×</button>
           </div>
           <ol className="feedback-guide-steps">
-            <li><a href="https://github.com/srvel/devnoder-finetune" target="_blank" rel="noopener noreferrer">Open the QLoRA Colab notebook ↗</a></li>
-            <li>Upload your exported .jsonl file</li>
-            <li>Run all cells (~2h on free T4 GPU)</li>
-            <li>Download the GGUF model</li>
-            <li>Upload to your HuggingFace account</li>
-            <li>Paste the URL in Settings → AI → Custom model</li>
+            <li><a href="https://github.com/imcoul/devnoder" target="_blank" rel="noopener noreferrer">Read the current DevNoder source and training notes</a></li>
+            <li>Use your exported JSONL with an external training environment you control.</li>
+            <li>Training cost, hardware and duration depend on the model and environment; DevNoder does not provide training compute.</li>
+            <li>To use the result here, convert it into a Transformers.js-compatible ONNX repository or serve it through an OpenAI-compatible endpoint.</li>
+            <li>Open AI → AI settings to connect that supported runtime. Direct GGUF import is not supported.</li>
           </ol>
         </div>
       )}

@@ -6,7 +6,7 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirro
 import { indentOnInput, bracketMatching, foldGutter, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { $buffers, $activeBuffer, bufferManager } from '../../services/editor/BufferManager';
-import { $theme } from '../../stores/ui';
+import { $theme, showToast } from '../../stores/ui';
 import { $ui } from '../../stores/ui';
 import { loadLanguage, LangId } from './languages';
 import { THEME_HIGHLIGHTS } from './theme';
@@ -17,8 +17,9 @@ const themeCompartment  = new Compartment();
 const tabCompartment    = new Compartment();
 const wrapCompartment   = new Compartment();
 const historyCompartment = new Compartment();
+const bufferSwapEffect = StateEffect.define<void>();
 
-function baseExtensions(fontSize: number): Extension[] {
+function baseExtensions(fontSize: number, saveActiveFile: () => boolean): Extension[] {
   return [
     lineNumbers(),
     highlightActiveLine(),
@@ -30,7 +31,10 @@ function baseExtensions(fontSize: number): Extension[] {
     dropCursor(),
     rectangularSelection(),
     crosshairCursor(),
-    keymap.of([...defaultKeymap, ...closeBracketsKeymap, indentWithTab]),
+    keymap.of([
+      { key: 'Mod-s', run: saveActiveFile },
+      ...defaultKeymap, ...closeBracketsKeymap, indentWithTab,
+    ]),
     EditorView.theme({
       '&': { height: '100%', fontSize: `${fontSize}px` },
       '.cm-scroller': { fontFamily: 'var(--font-code)', overflow: 'auto', height: '100%' },
@@ -56,7 +60,19 @@ export default function CodeEditor() {
   const lastIdRef   = useRef<string | null>(null);
   const yjsBoundRef = useRef(false);
 
+  const saveActiveFile = useCallback(() => {
+    const id = $activeBuffer.get();
+    if (!id) return false;
+    void bufferManager.save(id)
+      .then(() => showToast({ type: 'success', message: 'File saved' }))
+      .catch((error: unknown) => showToast({
+        type: 'error', message: error instanceof Error ? error.message : 'File could not be saved',
+      }));
+    return true;
+  }, []);
+
   const activeBuffer = buffers.find(b => b.id === activeId);
+  const hasActiveBuffer = Boolean(activeBuffer);
 
   // ── Init editor ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -65,13 +81,15 @@ export default function CodeEditor() {
     const state = EditorState.create({
       doc: '',
       extensions: [
-        ...baseExtensions(ui.fontSize),
+        ...baseExtensions(ui.fontSize, saveActiveFile),
         langCompartment.of([]),
         themeCompartment.of(THEME_HIGHLIGHTS[theme] ?? THEME_HIGHLIGHTS['default']),
         tabCompartment.of(EditorState.tabSize.of(ui.tabSize)),
         wrapCompartment.of(ui.wordWrap ? EditorView.lineWrapping : []),
         EditorView.updateListener.of(update => {
           if (!update.docChanged) return;
+          if (update.transactions.some(transaction =>
+            transaction.effects.some(effect => effect.is(bufferSwapEffect)))) return;
           if (yjsBoundRef.current) return;
           const id = $activeBuffer.get();
           if (!id) return;
@@ -98,8 +116,8 @@ export default function CodeEditor() {
 
     viewRef.current = new EditorView({ state, parent: editorRef.current });
 
-    return () => { viewRef.current?.destroy(); viewRef.current = null; };
-  }, []);
+    return () => { viewRef.current?.destroy(); viewRef.current = null; lastIdRef.current = null; };
+  }, [saveActiveFile, hasActiveBuffer]);
 
   // ── Swap buffer content ────────────────────────────────────────────────────
   useEffect(() => {
@@ -111,12 +129,15 @@ export default function CodeEditor() {
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: activeBuffer.content },
       selection: { anchor: 0 },
+      effects: bufferSwapEffect.of(),
     });
     view.scrollDOM.scrollTop = activeBuffer.scrollTop;
 
     // Swap language
     loadLanguage(activeBuffer.language as LangId).then(lang => {
-      view.dispatch({ effects: langCompartment.reconfigure(lang ? [lang] : []) });
+      if (viewRef.current === view && $activeBuffer.get() === activeId) {
+        view.dispatch({ effects: langCompartment.reconfigure(lang ? [lang] : []) });
+      }
     });
   }, [activeId, activeBuffer]);
 
@@ -210,9 +231,10 @@ export default function CodeEditor() {
         blockSize: '100%', flexDirection: 'column', gap: '0.5rem',
         color: 'var(--color-text-muted)', fontSize: '0.9rem',
       }}>
-        <span style={{ fontSize: '2rem' }}>💻</span>
+        <span style={{ fontFamily: 'var(--font-code)', fontSize: '2rem', color: 'var(--color-turquoise)' }} aria-hidden="true">&lt;/&gt;</span>
         <p>No file open</p>
-        <p style={{ fontSize: '0.75rem' }}>Open a file from the Git panel or create one</p>
+        <p style={{ fontSize: '0.85rem' }}>Open Files to choose a source file, or create your first one.</p>
+        <button type="button" onClick={() => window.dispatchEvent(new Event('devnoder:new-file'))} style={{ minHeight: 44, padding: '.65rem 1rem', background: 'var(--color-yellow)', color: '#0d1f1e', border: 0, borderRadius: 'var(--radius)', fontWeight: 700 }}>Create your first file</button>
       </div>
     );
   }
@@ -235,9 +257,30 @@ export default function CodeEditor() {
             {buf.dirty && <span style={{ color: 'var(--color-warn)', fontSize: '0.6rem' }}>●</span>}
             {buf.filename}
             <span style={{ cursor: 'pointer', opacity: 0.5, marginInlineStart: '0.2rem' }}
-              onClick={e => { e.stopPropagation(); bufferManager.close(buf.id); }}>×</span>
+              onClick={e => {
+                e.stopPropagation();
+                void bufferManager.close(buf.id).catch((error: unknown) => showToast({
+                  type: 'error', message: error instanceof Error ? error.message : 'File could not be saved',
+                }));
+              }}>×</span>
           </div>
         ))}
+        {activeBuffer.saving ? (
+          <span role="status" style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem' }}>Saving…</span>
+        ) : activeBuffer.saveError ? (
+          <button type="button" role="alert" onClick={() => saveActiveFile()} title={activeBuffer.saveError}
+            style={{ padding: '0.35rem 0.6rem', color: 'var(--color-error)' }}>
+            Save failed — retry
+          </button>
+        ) : activeBuffer.dirty ? (
+          <span role="status" style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem' }}>Unsaved changes</span>
+        ) : (
+          <span role="status" style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem', opacity: 0.7 }}>Saved</span>
+        )}
+        <button type="button" onClick={saveActiveFile} aria-label="Save file (Ctrl or Command plus S)"
+          style={{ minHeight: 44, padding: '0.35rem 0.6rem', color: 'var(--color-turquoise)', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)' }}>
+          Save
+        </button>
       </div>
       {/* Editor */}
       <div ref={editorRef} style={{ flex: 1, overflow: 'hidden' }}

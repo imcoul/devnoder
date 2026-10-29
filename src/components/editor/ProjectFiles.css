@@ -1,0 +1,19 @@
+.project-files { flex: 0 0 14rem; min-inline-size: 0; display: flex; flex-direction: column; overflow: auto; background: var(--color-surface); border-inline-end: 1px solid var(--color-border); }
+.project-files__header { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .8rem .75rem .65rem; border-block-end: 1px solid var(--color-border); }
+.project-files__eyebrow { display: block; color: var(--color-text-muted); font-size: .62rem; text-transform: uppercase; letter-spacing: .12em; }
+.project-files h2 { margin-block-start: .15rem; font: 700 1rem var(--font-display); }
+.project-files button { cursor: pointer; }
+.project-files__new-button { min-inline-size: 2.5rem; min-block-size: 2.5rem; display: grid; place-items: center; border: 1px solid var(--color-border); border-radius: var(--radius); color: var(--color-turquoise); background: transparent; }
+.project-files__new { display: flex; flex-direction: column; gap: .4rem; padding: .65rem; border-block-end: 1px solid var(--color-border); }
+.project-files__new label { color: var(--color-text-muted); font-size: .72rem; }
+.project-files__new input { min-block-size: 2.5rem; padding: .5rem; border: 1px solid var(--color-border); border-radius: var(--radius); color: var(--color-text); background: var(--color-canvas); }
+.project-files__new button, .project-files__empty button { min-block-size: 2.5rem; padding: .5rem .65rem; border: 1px solid var(--color-turquoise); border-radius: var(--radius); color: var(--color-turquoise); background: transparent; }
+.project-files__new button:disabled { opacity: .5; }
+.project-files__tree { padding: .35rem; }
+.project-files__row { inline-size: 100%; min-block-size: 2.5rem; display: flex; align-items: center; gap: .5rem; padding: .45rem .5rem; border: 0; border-radius: var(--radius); color: var(--color-text-muted); background: transparent; text-align: start; font: .78rem var(--font-code); }
+.project-files__row:hover { color: var(--color-text); background: var(--color-surface-hover); }
+.project-files__row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-files__empty, .project-files__error { padding: .8rem; color: var(--color-text-muted); font-size: .78rem; }
+.project-files__empty button { margin-block-start: .6rem; }
+.project-files__error { color: var(--color-error); }
+@media (max-width: 48rem) { .project-files { flex-basis: 11rem; } }

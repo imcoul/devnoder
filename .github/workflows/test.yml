@@ -31,10 +31,5 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npm run build
-      - uses: microsoft/playwright-github-action@v1
-        with:
-          browsers: chromium
-      - run: npx playwright install chromium
+      - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
-        env:
-          VITE_GITHUB_CLIENT_ID: ${{ secrets.VITE_GITHUB_CLIENT_ID }}

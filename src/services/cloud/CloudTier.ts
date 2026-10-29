@@ -1,8 +1,6 @@
 // ── Cloud Tier Service ────────────────────────────────────────
-// Manages DevNoder hosted tier subscriptions.
-// Free tier = full AGPL core, no limits.
-// Hosted tier = cloud sync, team management, priority AI, SLA.
-// Billing via Stripe (client-side only — no secrets in browser).
+// Describes the planned hosted tier matrix; billing is deliberately disabled
+// until a server-verified entitlement and checkout service are configured.
 
 import { atom } from 'nanostores'
 import { getSetting, setSetting } from '../storage/db'
@@ -62,34 +60,18 @@ export const $subscription = atom<Subscription>({
 // ── Load subscription ─────────────────────────────────────────
 
 export async function loadSubscription(): Promise<void> {
+  // Billing has no configured, signed server entitlement in this deployment.
+  // Never restore an editable localStorage/IndexedDB value as a paid plan.
+  $subscription.set({ tier: 'free', seats: 1, status: 'none', cancelAtPeriodEnd: false })
   const raw = await getSetting('subscription', '')
-  const cached = raw ? (JSON.parse(raw) as Subscription | undefined) : undefined
-  if (cached && cached.tier) {
-    $subscription.set(cached)
-    return
-  }
-
-  const token = await getSetting('billing.token') as string | undefined
-  if (!token || !navigator.onLine) return
-
-  try {
-    const res = await fetch('https://devnoder-executor.srvel-build.workers.dev/billing/subscription', {
-      headers: { 'Authorization': `Bearer ${token}` },
-    })
-    if (!res.ok) return
-    const data = await res.json() as any
-    const sub: Subscription = {
-      tier:              data.tier ?? 'free',
-      seats:             data.seats ?? 1,
-      status:            data.status ?? 'none',
-      currentPeriodEnd:  data.currentPeriodEnd ? new Date(data.currentPeriodEnd) : undefined,
-      cancelAtPeriodEnd: data.cancelAtPeriodEnd ?? false,
-      teamId:            data.teamId,
-      customerId:        data.customerId,
+  if (raw) {
+    try {
+      const cached = JSON.parse(raw) as Partial<Subscription>
+      if (cached.tier && cached.tier !== 'free') await setSetting('subscription', '')
+    } catch {
+      await setSetting('subscription', '')
     }
-    $subscription.set(sub)
-    await setSetting('subscription', JSON.stringify(sub))
-  } catch { /* offline — use cached */ }
+  }
 }
 
 // ── Feature gating ────────────────────────────────────────────
@@ -114,42 +96,14 @@ export function isHosted(): boolean {
   return $subscription.get().tier !== 'free'
 }
 
-// ── Stripe checkout ───────────────────────────────────────────
-
-const STRIPE_PUBLISHABLE_KEY = 'pk_live_REPLACE_WITH_STRIPE_KEY'
-const CHECKOUT_WORKER        = 'https://devnoder-executor.srvel-build.workers.dev/billing'
-
 export async function startCheckout(tier: 'hosted' | 'team', seats = 1): Promise<void> {
-  if (!navigator.onLine) throw new Error('Internet required to subscribe')
-
-  const res = await fetch(`${CHECKOUT_WORKER}/create-checkout`, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      tier, seats,
-      successUrl: `${window.location.origin}?billing=success`,
-      cancelUrl:  `${window.location.origin}?billing=cancel`,
-    }),
-  })
-
-  if (!res.ok) throw new Error('Failed to create checkout session')
-  const { url } = await res.json() as { url: string }
-  window.open(url, '_blank')
+  void tier;
+  void seats;
+  throw new Error('Billing and checkout are not configured in this release.')
 }
 
 export async function openCustomerPortal(): Promise<void> {
-  const token = await getSetting('billing.token') as string | undefined
-  if (!token) throw new Error('Not authenticated')
-
-  const res = await fetch(`${CHECKOUT_WORKER}/portal`, {
-    method:  'POST',
-    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ returnUrl: window.location.origin }),
-  })
-
-  if (!res.ok) throw new Error('Failed to open billing portal')
-  const { url } = await res.json() as { url: string }
-  window.open(url, '_blank')
+  throw new Error('Customer billing portal is not configured in this release.')
 }
 
 // ── Handle billing callback (on app load) ────────────────────
@@ -163,10 +117,8 @@ export async function handleBillingCallback(): Promise<'success' | 'cancel' | nu
   window.history.replaceState({}, '', window.location.pathname)
 
   if (billing === 'success') {
-    // Re-fetch subscription after successful checkout
     await setSetting('subscription', '')
     await loadSubscription()
-    return 'success'
   }
-  return 'cancel'
+  return null
 }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { showToast } from '../../stores/ui';
+import { AppIcon } from '../brand/AppIcon';
 import './InstallPrompt.css';
 
 export default function InstallPrompt() {
@@ -30,7 +31,7 @@ export default function InstallPrompt() {
 
   return (
     <button className="install-prompt" onClick={install} title="Install DevNoder as an app">
-      ⬇ Install
+      <AppIcon name="download" size={16} /> Install
     </button>
   );
 }

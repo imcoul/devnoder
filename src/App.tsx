@@ -7,6 +7,7 @@ import CommandPalette from './components/layout/CommandPalette';
 import ToastContainer from './components/layout/ToastContainer';
 import InstallPrompt from './components/layout/InstallPrompt';
 import OfflineBanner from './components/layout/OfflineBanner';
+import WorkspaceHeader from './components/layout/WorkspaceHeader';
 import { audioCueService } from './services/accessibility/AudioCueService';
 import { projectService } from './services/project/ProjectService';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -16,6 +17,7 @@ export default function App() {
   const activePanel = useStore($activePanel);
   const theme       = useStore($theme);
   const [checkingProjects, setCheckingProjects] = useState(true);
+  const [startupError, setStartupError] = useState<string | null>(null);
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -35,7 +37,11 @@ export default function App() {
     projectService.resumeLastProject().then(resumed => {
       if (!resumed) setPanel('onboarding');
       setCheckingProjects(false);
-    }).catch(() => setCheckingProjects(false));
+    }).catch((error: unknown) => {
+      setStartupError(error instanceof Error ? error.message : 'Projects could not be loaded. You can retry or start a new local project.');
+      setPanel('onboarding');
+      setCheckingProjects(false);
+    });
   }, []);
 
   useEffect(() => {
@@ -70,11 +76,6 @@ export default function App() {
     // Sprint 9 — restore saved community theme tokens
     import('./services/community/ThemeRegistry')
       .then(m => m.themeRegistry.reapplySaved())
-      .catch(console.warn);
-
-    // Sprint 14 — pre-load embedding model (background, non-blocking)
-    import('./services/ai/EmbeddingEngine')
-      .then(m => m.embeddingEngine.loadModel())
       .catch(console.warn);
 
     // Sprint 13 — seed built-in skills
@@ -114,12 +115,26 @@ export default function App() {
   }, []);
 
   if (checkingProjects) {
-    return <div className="app-root" aria-busy="true" />;
+    return <div className="app-root" aria-busy="true">
+      <WorkspaceHeader />
+      <main style={{ margin: 'auto', padding: '2rem', textAlign: 'center' }}>
+        <p role="status">Opening this browser's workspace…</p>
+        <p style={{ color: 'var(--color-text-muted)' }}>Your existing project files are not being cleared.</p>
+        <button type="button" onClick={() => window.location.reload()} style={{ minHeight: 44, padding: '.6rem 1rem' }}>Retry opening workspace</button>
+      </main>
+    </div>;
   }
 
   return (
     <ErrorBoundary>
       <div className="app-root">
+        <WorkspaceHeader />
+        {startupError && (
+          <div className="app-startup-error" role="alert" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', padding: '0.5rem 0.75rem', background: 'var(--color-surface)', borderBlockEnd: '1px solid var(--color-error)', color: 'var(--color-text)' }}>
+            <span>{startupError}</span>
+            <button type="button" onClick={() => window.location.reload()} style={{ minBlockSize: '2.5rem', padding: '0.4rem 0.7rem', border: '1px solid var(--color-turquoise)', borderRadius: 'var(--radius)', background: 'transparent', color: 'var(--color-turquoise)' }}>Retry</button>
+          </div>
+        )}
         <main className="app-main" ref={mainRef} tabIndex={-1}>
           <PanelShell panelId={activePanel} />
         </main>
